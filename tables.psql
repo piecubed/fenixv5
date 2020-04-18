@@ -1,0 +1,79 @@
+CREATE TABLE Users(
+    uid SERIAL PRIMARY KEY UNIQUE,
+    username TEXT NOT NULL,
+    password BYTEA NOT NULL,
+    email CITEXT NOT NULL UNIQUE,
+    salt BYTEA NOT NULL,
+    settings JSON,
+    token TEXT NOT NULL UNIQUE,
+    usernameHash SERIAL UNIQUE,
+    createdAt TIMESTAMP NOT NULL,
+    verified BOOLEAN NOT NULL
+);
+
+CREATE TABLE Channels(
+    id SERIAL PRIMARY KEY UNIQUE,
+    name TEXT NOT NULL,
+    serverID TEXT NOT NULL,
+    createdAt TIMESTAMP NOT NULL
+);
+
+CREATE TABLE Servers(
+    id SERIAL INT PRIMARY KEY UNIQUE,
+    ownerID TEXT NOT NULL,
+    createdAt TIMESTAMP NOT NULL,
+    name TEXT NOT NULL,
+    icon TEXT,
+    joinChannel TEXT NOT NULL
+);
+
+CREATE TABLE Messages(
+    id BOOLEAN PRIMARY KEY UNIQUE,
+    channelID TEXT NOT NULL,
+    userID TEXT NOT NULL,
+    serverID TEXT NOT NULL,
+    contents TEXT NOT NULL,
+    stamp TIMESTAMP NOT NULL
+);
+
+CREATE TABLE ServerRegistration(
+    userID TEXT NOT NULL,
+    serverID TEXT NOT NULL,
+    roles TEXT[] NOT NULL
+);
+
+CREATE TABLE Roles(
+    id SERIAL PRIMARY KEY UNIQUE,
+    serverID TEXT NOT NULL,
+    name TEXT NOT NULL,
+    color TEXT NOT NULL
+);
+
+CREATE TABLE ServerPermissions(
+    userID TEXT NOT NULL,
+    serverID TEXT NOT NULL,
+    admin BOOLEAN NOT NULL,
+    addChannels BOOLEAN NOT NULL,
+    kick BOOLEAN NOT NULL,
+    ban BOOLEAN NOT NULL,
+    changeNick BOOLEAN NOT NULL,
+    changeOthersNick BOOLEAN NOT NULL,
+    mentionEveryone BOOLEAN NOT NULL
+);
+
+CREATE TABLE ChannelPermissions(
+    userID TEXT NOT NULL,
+    channelID TEXT NOT NULL,
+    canRead BOOLEAN NOT NULL,
+    canTalk BOOLEAN NOT NULL,
+    canReadHistory BOOLEAN NOT NULL
+);
+
+CREATE TABLE Bots(
+    id SERIAL PRIMARY KEY UNIQUE,
+    ownerID TEXT NOT NULL,
+    createdAt TIMESTAMP NOT NULL,
+    username TEXT NOT NULL UNIQUE,
+    token TEXT NOT NULL UNIQUE,
+    ownerEmail CITEXT NOT NULL
+);
