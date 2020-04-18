@@ -4,8 +4,8 @@ import hashlib
 import secrets
 from typing import Any, Dict, List
 
-import asyncpg # type: ignore
-from email_validator import EmailNotValidError, validate_email # type: ignore
+import asyncpg
+from email_validator import EmailNotValidError, validate_email
 
 
 class User:
@@ -33,17 +33,17 @@ class User:
     def checkPassword(self, password: bytes) -> bool:
         return secrets.compare_digest(AuthUtils.checkPassword(self.salt, password), self.password)
 
-    def checkToken(self, token) -> bool:
+    def checkToken(self, token: str) -> bool:
         return self.token == token
 
-    def isUser(self, uid) -> bool:
+    def isUser(self, uid: str) -> bool:
         return self.uid == uid
 
     def __str__(self) -> str:
         return self.username
 
     @classmethod
-    def fromDict(cls, source: Dict) -> User:
+    def fromDict(cls, source: Dict[str, Any]) -> User:
         self = cls()
         self.uid = source['uid']
         self.username = source['username']
@@ -163,7 +163,7 @@ class Role:
 
 class Database:
 
-    def __init__(self, databaseUrl='postgresql://piesquared@localhost:5432/fenix') -> None:
+    def __init__(self, databaseUrl: str ='postgresql://piesquared@localhost:5432/fenix') -> None:
         self.databaseUrl = databaseUrl
 
     pool: asyncpg.Connection
@@ -171,10 +171,10 @@ class Database:
     async def connect(self) -> None:
         self.pool = await asyncpg.create_pool(self.databaseUrl)
 
-    async def execute(self, statement: str, *bindings) -> None:
+    async def execute(self, statement: str, *bindings: Any) -> None:
         self.pool.execute(statement, *bindings)
 
-    async def fetch(self, statement: str, *bindings) -> List[asyncpg.Record]:
+    async def fetch(self, statement: str, *bindings: Any) -> Any:
         return self.pool.fetch(statement, *bindings)
 
 class _UsersSQL:
@@ -196,7 +196,7 @@ class Users(Database):
         except KeyError:
             raise UserNotFound(f'{email} is not registered!')
 
-    async def validate(self, username: str, password: bytes, email: str):
+    async def validate(self, username: str, password: bytes, email: str) -> None:
         # Check if the user is already registered
         try:
             await self.fetchUserByEmail(email)
@@ -283,7 +283,7 @@ class _ServerSQL:
 
 class Servers(Database):
 
-    def validate(self, name: str):
+    def validate(self, name: str) -> None:
         if len(name) > 40:
             raise InvalidServerName
 

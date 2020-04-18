@@ -10,7 +10,7 @@ mypy = "*"
 [packages]
 websockets = "*"
 asyncpg = "*"
-email-validator = "*"
+email_validator = "*"
 
 [requires]
 python_version = "3.8"
