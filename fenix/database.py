@@ -163,10 +163,13 @@ class Role:
 
 class Database:
 
+    def __init__(self, databaseUrl='postgresql://piesquared@localhost:5432/fenix') -> None:
+        self.databaseUrl = databaseUrl
+
     pool: asyncpg.Connection
 
     async def connect(self) -> None:
-        self.pool = await asyncpg.create_pool()
+        self.pool = await asyncpg.create_pool(self.databaseUrl)
 
     async def execute(self, statement: str, *bindings) -> None:
         self.pool.execute(statement, *bindings)
@@ -204,10 +207,10 @@ class Users(Database):
         # Check if the username is above 3 characters and below 32
         if not len(username) >= 3 or not len(username) <= 32:
             raise InvalidCredentials
-        
+
         # Validate the email
         try:
-            validate_email(email) 
+            validate_email(email)
         except EmailNotValidError as e:
             raise InvalidCredentials
 
@@ -277,33 +280,28 @@ class Users(Database):
 class _ServerSQL:
     createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES ($1, current_time, $2) RETURNING id'
     getServer = 'SELECT * FROM Servers WHERE id = $1'
+
 class Servers(Database):
-    
+
     def validate(self, name: str):
         if len(name) > 40:
-            raise InvalidServerName 
-        
+            raise InvalidServerName
+
     async def getServer(self, serverID: str) -> Server:
         server = await self.fetch(_ServerSQL.getServer, serverID)
         return Server.fromDict(server[0])
-    
+
     async def createServer(self, userID: str, name: str) -> Server:
         self.validate(name)
-        
+
         serverID = await self.fetch(_ServerSQL.createServer, userID, name)
         server = await self.getServer(serverID[0])
-        
+
         return server
 
 class InvalidServerName(Exception):
     pass
 
-class UserNotFound(Exception):
-    pass
-
-class InvalidCredentials(Exception):
-    pass
-        
 class UserNotFound(Exception):
     pass
 
