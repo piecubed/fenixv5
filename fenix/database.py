@@ -303,7 +303,7 @@ class Users(Database):
 
         return Server.fromDict(server[0])
 
-    async def joinRole(self, userID, serverID, roleID) -> Role:
+    async def joinRole(self, userID: str, serverID: str, roleID: str) -> Role:
         raise NotImplementedError
 
 class _ServerSQL:

@@ -5,7 +5,8 @@
   "python.linting.mypyArgs": [
     "--ignore-missing-imports",
     "--follow-imports=silent",
-    "--show-column-numbers"
+    "--show-column-numbers",
+    "--strict"
   ],
   "python.testing.unittestArgs": [
     "-v",
