@@ -29,7 +29,7 @@ CREATE TABLE Servers(
     createdAt TIMESTAMP NOT NULL,
     name TEXT NOT NULL,
     icon TEXT,
-    joinChannel TEXT NOT NULL
+    joinChannel TEXT
 );
 
 DROP TABLE IF EXISTS Messages;
@@ -46,7 +46,7 @@ DROP TABLE IF EXISTS ServerRegistration;
 CREATE TABLE ServerRegistration(
     userID TEXT NOT NULL,
     serverID TEXT NOT NULL,
-    roles TEXT[] NOT NULL
+    roles TEXT[] NOT NULL DEFAULT '{}'
 );
 
 DROP TABLE IF EXISTS Roles;

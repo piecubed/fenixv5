@@ -20,9 +20,9 @@ class User:
 
     uid: str
     username: str
-    password: bytearray
+    password: bytes
     email: str
-    salt: bytearray
+    salt: bytes
     settings: Dict[str, Any]
     token: str
     usernameHash: str
@@ -53,16 +53,16 @@ class User:
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'User':
         self = cls()
-        self.uid = source['uid']
-        self.username = source['username']
-        self.password = source['password']
-        self.email = source['email']
-        self.salt = source['salt']
+        self.uid = str(source['uid'])
+        self.username = str(source['username'])
+        self.password = bytes(source['password'])
+        self.email = str(source['email'])
+        self.salt = bytes(source['salt'])
         self.settings = source['settings']
-        self.token = source['token']
-        self.usernameHash = source['usernamehash']
+        self.token = str(source['token'])
+        self.usernameHash = str(source['usernamehash'])
         self.createdAt = source['createdat']
-        self.verified = source['verified']
+        self.verified = bool(source['verified'])
         try:
             self.servers = source['servers']
         except KeyError:
@@ -71,8 +71,8 @@ class User:
 
 class AuthUtils:
     @classmethod
-    def checkPassword(cls, password: bytes, salt: bytes) -> bytearray:
-        return bytearray(base64.b64encode(hashlib.pbkdf2_hmac('sha512', password, salt, 100000)))
+    def checkPassword(cls, password: bytes, salt: bytes) -> bytes:
+        return hashlib.pbkdf2_hmac('sha512', password, salt, 100000)
 
 
 class Server:
@@ -85,10 +85,11 @@ class Server:
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Server':
         self = cls()
-        self.ID = source['id']
-        self.name = source['name']
-        self.createdAt = source['createdAt']
-        self.settings = source['settings']
+        self.ID = str(source['id'])
+        self.name = str(source['name'])
+        self.createdAt = source['createdat']
+        if 'settings' in source.keys():
+            self.settings = source['settings']
         return self
 
     @classmethod
@@ -116,8 +117,8 @@ class Permission:
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Permission':
         self = cls()
-        self.name = source['name']
-        self.id = source['id']
+        self.name = str(source['name'])
+        self.id = int(source['id'])
 
         return self
 
@@ -147,9 +148,9 @@ class Role:
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Role':
         self = cls()
-        self.name = source['name']
-        self.color = source['color']
-        self.id = source['id']
+        self.name = str(source['name'])
+        self.color = str(source['color'])
+        self.id = str(source['id'])
 
         return self
 
@@ -194,13 +195,15 @@ class Database:
 
 class _UsersSQL:
     fetchUserByEmail = 'SELECT * FROM Users WHERE email = $1'
-    signUp = 'INSERT INTO Users(username, password, email, salt, token, createdAt, verified)' \
-        ' VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, TRUE) RETURNING *'
-    getServers = 'SELECT * FROM ServerRegistration INNER JOIN Servers ON ServerRegistration.userID = $1' \
+    signUp = 'INSERT INTO Users(username, password, email, salt, token, createdAt, verified) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, TRUE) RETURNING *'
+    getServers = 'SELECT * FROM ServerRegistration INNER JOIN Servers ON ServerRegistration.userID = CAST($1 AS INT)' \
         'and Servers.id = ServerRegistration.serverID'
-    getPerms = 'SELECT * FROM ServerPermissions WHERE userID = $1 and serverID = $2'
+    signIn = 'SELECT * FROM Users WHERE email = $1 and password = $2'
+    getPerms = 'SELECT * FROM ServerPermissions WHERE userID = CAST($1 AS INT) and serverID = CAST($2 AS INT)'
     getRoles = 'SELECT ServerRegistration.Roles FROM ServerRegistration INNER JOIN Roles ON '\
-        'ServerRegistration.userID = $1 AND ServerRegistration.serverID = $2 AND Roles.id = ANY(ServerRegistration.roles)'
+        'ServerRegistration.userID = CAST($1 AS INT) AND ServerRegistration.serverID = CAST($2 AS INT) AND Roles.id = ANY(ServerRegistration.roles)'
+    joinServer = 'INSERT INTO ServerRegistration(userID, serverID) VALUES ($1, $2)'
+    getServer = 'SELECT * FROM Servers WHERE id = $1'
 
 class Users(Database):
 
@@ -229,22 +232,23 @@ class Users(Database):
         except EmailNotValidError:
             raise InvalidCredentials from None
 
-    async def signUp(self, username: str, password: bytes, email: str) -> User:
-        await self.__validate(username, password, email)
+    async def signUp(self, username: str, password: str, email: str) -> User:
+        await self.__validate(username, password.encode('utf-8'), email)
 
         salt = secrets.token_hex(32).encode('utf-8')
         token = secrets.token_hex(128)
-        hash: bytearray = AuthUtils.checkPassword(password, salt)
+        hash: bytes = AuthUtils.checkPassword(password.encode('utf-8'), salt)
 
         user = await self._fetch(_UsersSQL.signUp, username, hash, email, salt, token)
 
-        print(user)
         return User.fromDict(user[0])
 
     async def signIn(self, email: str, password: str) -> User:
         user: User = await self.fetchUserByEmail(email)
 
-        if not user.checkPassword(user.password):
+        hash: bytes = AuthUtils.checkPassword(password.encode('utf-8'), user.salt)
+
+        if not secrets.compare_digest(hash, user.password):
             raise InvalidCredentials
 
         return user
@@ -293,10 +297,18 @@ class Users(Database):
         except KeyError:
             return []
 
+    async def joinServer(self, userID: str, serverID: str) -> Server:
+        await self._execute(_UsersSQL.joinServer, userID, serverID)
+        server = await self._fetch(_UsersSQL.getServer, int(serverID))
+
+        return Server.fromDict(server[0])
+
+    async def joinRole(self, userID, serverID, roleID) -> Role:
+        raise NotImplementedError
 
 class _ServerSQL:
-    createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES ($1, current_time, $2) RETURNING id'
-    getServer = 'SELECT * FROM Servers WHERE id = $1'
+    createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES (CAST($1 AS INT), CURRENT_TIMESTAMP, $2) RETURNING id'
+    getServer = 'SELECT * FROM Servers WHERE id = CAST($1 AS INT)'
 
 
 class Servers(Database):
@@ -312,8 +324,8 @@ class Servers(Database):
     async def createServer(self, userID: str, name: str) -> Server:
         self.validate(name)
 
-        serverID = await self._fetch(_ServerSQL.createServer, userID, name)
-        server = await self.getServer(serverID[0])
+        serverID = await self._fetch(_ServerSQL.createServer, int(userID), name)
+        server = await self.getServer(serverID[0]['id'])
 
         return server
 
