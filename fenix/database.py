@@ -6,9 +6,9 @@ from typing import Any, Dict, List
 
 try:
     import fenix.conf as conf
+    password = conf.databasePassword
 except ImportError:
-    print('conf.py is required.')
-    exit()
+    password = 'test'
 
 import asyncpg
 from email_validator import EmailNotValidError, validate_email
@@ -179,7 +179,7 @@ class Database:
     __pool: asyncpg.Connection = None
 
     async def __connect(self) -> None:
-        self.__pool: asyncpg.Connection = await asyncpg.create_pool(self.__databaseUrl, password=conf.databasePassword)
+        self.__pool: asyncpg.Connection = await asyncpg.create_pool(self.__databaseUrl, password=password)
 
     async def _execute(self, statement: str, *bindings: Any) -> None:
         if self.__pool is None:
