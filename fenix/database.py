@@ -60,8 +60,8 @@ class User:
         self.salt = source['salt']
         self.settings = source['settings']
         self.token = source['token']
-        self.usernameHash = source['usernameHash']
-        self.createdAt = source['createdAt']
+        self.usernameHash = source['usernamehash']
+        self.createdAt = source['createdat']
         self.verified = source['verified']
         try:
             self.servers = source['servers']
@@ -194,8 +194,8 @@ class Database:
 
 class _UsersSQL:
     fetchUserByEmail = 'SELECT * FROM Users WHERE email = $1'
-    signUp = 'INSERT INTO Users (username, password, email, salt, settings, token, createdAt, verified)' \
-        'VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIME, 1)'
+    signUp = 'INSERT INTO Users(username, password, email, salt, token, createdAt, verified)' \
+        ' VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, TRUE) RETURNING *'
     getServers = 'SELECT * FROM ServerRegistration INNER JOIN Servers ON ServerRegistration.userID = $1' \
         'and Servers.id = ServerRegistration.serverID'
     getPerms = 'SELECT * FROM ServerPermissions WHERE userID = $1 and serverID = $2'
@@ -205,7 +205,7 @@ class _UsersSQL:
 class Users(Database):
 
     async def fetchUserByEmail(self, email: str) -> User:
-        query = (await self._fetch(_UsersSQL.fetchUserByEmail, email))
+        query = await self._fetch(_UsersSQL.fetchUserByEmail, email)
         try:
             return User.fromDict(query[0])
         except (IndexError, KeyError):
@@ -233,12 +233,13 @@ class Users(Database):
         await self.__validate(username, password, email)
 
         salt = secrets.token_hex(32).encode('utf-8')
-        token = secrets.token_hex(128).encode('utf-8')
-        password = AuthUtils.checkPassword(password, salt)
+        token = secrets.token_hex(128)
+        hash: bytearray = AuthUtils.checkPassword(password, salt)
 
-        await self._execute(_UsersSQL.signUp, username, password, email, salt, '{}', token)
-        
-        return await self.fetchUserByEmail(email)
+        user = await self._fetch(_UsersSQL.signUp, username, hash, email, salt, token)
+
+        print(user)
+        return User.fromDict(user[0])
 
     async def signIn(self, email: str, password: str) -> User:
         user: User = await self.fetchUserByEmail(email)

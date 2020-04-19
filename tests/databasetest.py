@@ -13,7 +13,7 @@ class UserDatabaseTests(unittest.TestCase):
     @asyncTest #type: ignore
     async def test2(self) -> None:
         await self.createDatabase()
-        await self.usersDatabase.signUp('test', 'testpassword'.encode('utf-8'), 'test@test.test')
+        await self.usersDatabase.signUp('test', 'testpassword'.encode('utf-8'), 'piesquared@gmail.com')
 
 
 if __name__ == '__main__':
