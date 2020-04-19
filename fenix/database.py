@@ -7,6 +7,8 @@ from typing import Any, Dict, List
 import asyncpg
 from email_validator import EmailNotValidError, validate_email
 
+# These are basically headers, since annotations are parsed weird
+
 
 class User:
 
@@ -20,7 +22,7 @@ class User:
     usernameHash: str
     createdAt: datetime.datetime
     verified: bool
-    servers: Dict[str, Server]
+    servers: Dict[str, 'Server']
 
     @property
     def hasServers(self) -> bool:
@@ -43,7 +45,7 @@ class User:
         return self.username
 
     @classmethod
-    def fromDict(cls, source: Dict[str, Any]) -> User:
+    def fromDict(cls, source: Dict[str, Any]) -> 'User':
         self = cls()
         self.uid = source['uid']
         self.username = source['username']
@@ -75,7 +77,7 @@ class Server:
     settings: Dict[str, Any]
 
     @classmethod
-    def fromDict(cls, source: Dict[str, Any]) -> Server:
+    def fromDict(cls, source: Dict[str, Any]) -> 'Server':
         self = cls()
         self.ID = source['id']
         self.name = source['name']
@@ -84,16 +86,16 @@ class Server:
         return self
 
     @classmethod
-    def fromListToList(cls, source: List[Dict[str, Any]]) -> List[Server]:
-        servers: List[Server] = []
+    def fromListToList(cls, source: List[Dict[str, Any]]) -> List['Server']:
+        servers: List['Server'] = []
         for raw in source:
             servers.append(cls.fromDict(raw))
 
         return servers
 
     @classmethod
-    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[str, Server]:
-        servers: Dict[str, Server] = {}
+    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[str, 'Server']:
+        servers: Dict[str, 'Server'] = {}
         for raw in source:
             server = cls.fromDict(raw)
             servers[server.ID] = server
@@ -106,7 +108,7 @@ class Permission:
     id: int
 
     @classmethod
-    def fromDict(cls, source: Dict[str, Any]) -> Permission:
+    def fromDict(cls, source: Dict[str, Any]) -> 'Permission':
         self = cls()
         self.name = source['name']
         self.id = source['id']
@@ -114,21 +116,22 @@ class Permission:
         return self
 
     @classmethod
-    def fromListToList(cls, source: List[Dict[str, Any]]) -> List[Permission]:
-        permissions: List[Permission] = []
+    def fromListToList(cls, source: List[Dict[str, Any]]) -> List['Permission']:
+        permissions: List['Permission'] = []
         for raw in source:
             permissions.append(cls.fromDict(raw))
 
         return permissions
 
     @classmethod
-    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[int, Permission]:
-        permissions: Dict[int, Permission] = {}
+    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[int, 'Permission']:
+        permissions: Dict[int, 'Permission'] = {}
         for raw in source:
             permission = cls.fromDict(raw)
             permissions[permission.id] = permission
 
         return permissions
+
 
 class Role:
     name: str
@@ -136,7 +139,7 @@ class Role:
     id: str
 
     @classmethod
-    def fromDict(cls, source: Dict[str, Any]) -> Role:
+    def fromDict(cls, source: Dict[str, Any]) -> 'Role':
         self = cls()
         self.name = source['name']
         self.color = source['color']
@@ -145,8 +148,8 @@ class Role:
         return self
 
     @classmethod
-    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[str, Role]:
-        roles: Dict[str, Role] = {}
+    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[str, 'Role']:
+        roles: Dict[str, 'Role'] = {}
         for raw in source:
             role = cls.fromDict(raw)
             roles[role.id] = role
@@ -154,8 +157,8 @@ class Role:
         return roles
 
     @classmethod
-    def fromListToList(cls, source: List[Dict[str, Any]]) -> List[Role]:
-        roles: List[Role] = []
+    def fromListToList(cls, source: List[Dict[str, Any]]) -> List['Role']:
+        roles: List['Role'] = []
         for raw in source:
             roles.append(cls.fromDict(raw))
 
@@ -163,19 +166,25 @@ class Role:
 
 class Database:
 
-    def __init__(self, databaseUrl: str ='postgresql://piesquared@localhost:5432/fenix') -> None:
-        self.databaseUrl = databaseUrl
+    def __init__(self, databaseUrl: str = 'postgresql://piesquared@localhost:5432/fenix') -> None:
+        self._databaseUrl: str = databaseUrl
 
-    pool: asyncpg.Connection
+    _pool: asyncpg.Connection
 
-    async def connect(self) -> None:
-        self.pool = await asyncpg.create_pool(self.databaseUrl)
+    async def _connect(self) -> None:
+        self._pool: asyncpg.Connection = await asyncpg.create_pool(self._databaseUrl)
 
-    async def execute(self, statement: str, *bindings: Any) -> None:
-        self.pool.execute(statement, *bindings)
+    async def _execute(self, statement: str, *bindings: Any) -> None:
+        if self._pool is None:
+            await self._connect()
 
-    async def fetch(self, statement: str, *bindings: Any) -> Any:
-        return self.pool.fetch(statement, *bindings)
+        await self._pool.execute(statement, *bindings) #type: ignore
+
+    async def _fetch(self, statement: str, *bindings: Any) -> asyncpg.Record:
+
+        if self._pool is None:
+            await self._connect()
+        return await self._pool.fetch(statement, *bindings) #type: ignore
 
 class _UsersSQL:
     fetchUserByEmail = 'SELECT * FROM Users WHERE email = $1'
@@ -190,13 +199,13 @@ class _UsersSQL:
 class Users(Database):
 
     async def fetchUserByEmail(self, email: str) -> User:
-        query = (await self.fetch(_UsersSQL.fetchUserByEmail))[0]
+        query = (await self._fetch(_UsersSQL.fetchUserByEmail))[0]
         try:
             return User.fromDict(query)
         except KeyError:
             raise UserNotFound(f'{email} is not registered!')
 
-    async def validate(self, username: str, password: bytes, email: str) -> None:
+    async def __validate(self, username: str, password: bytes, email: str) -> None:
         # Check if the user is already registered
         try:
             await self.fetchUserByEmail(email)
@@ -211,17 +220,17 @@ class Users(Database):
         # Validate the email
         try:
             validate_email(email)
-        except EmailNotValidError as e:
-            raise InvalidCredentials
+        except EmailNotValidError:
+            raise InvalidCredentials from None
 
     async def signUp(self, username: str, password: bytes, email: str) -> User:
-        await self.validate(username, password, email)
+        await self.__validate(username, password, email)
 
         salt = base64.b64encode(secrets.token_hex(32).encode('utf-8'))
         token = base64.b64encode(secrets.token_hex(128).encode('utf-8')).decode('utf-8')
         password = AuthUtils.checkPassword(password, salt)
 
-        self.execute(_UsersSQL.signUp, username, password, email, salt, '{}', token)
+        self._execute(_UsersSQL.signUp, username, password, email, salt, '{}', token)
 
         return await self.fetchUserByEmail(email)
 
@@ -234,7 +243,7 @@ class Users(Database):
         return user
 
     async def getServers(self, id: str) -> Dict[str, Server]:
-        servers = await self.fetch(_UsersSQL.getServers, id)
+        servers = await self._fetch(_UsersSQL.getServers, id)
 
         try:
             return Server.fromListToDict(servers)
@@ -243,11 +252,11 @@ class Users(Database):
             return {}
 
     async def getPerms(self, userID: str, serverID: str) -> Dict[int, Permission]:
-        perms = await self.fetch(_UsersSQL.getPerms, userID, serverID)
+        perms = await self._fetch(_UsersSQL.getPerms, userID, serverID)
         return Permission.fromListToDict(perms)
 
     async def getRoles(self, userID: str, serverID: str) -> Dict[str, Role]:
-        roles = await self.fetch(_UsersSQL.getRoles, userID, serverID)
+        roles = await self._fetch(_UsersSQL.getRoles, userID, serverID)
 
         try:
             return Role.fromListToDict(roles)
@@ -256,7 +265,7 @@ class Users(Database):
             return {}
 
     async def getServersList(self, id: str) -> List[Server]:
-        servers = await self.fetch(_UsersSQL.getServers, id)
+        servers = await self._fetch(_UsersSQL.getServers, id)
 
         try:
             return Server.fromListToList(servers)
@@ -265,11 +274,11 @@ class Users(Database):
             return []
 
     async def getPermsList(self, userID: str, serverID: str) -> List[Permission]:
-        perms = await self.fetch(_UsersSQL.getPerms, userID, serverID)
+        perms = await self._fetch(_UsersSQL.getPerms, userID, serverID)
         return Permission.fromListToList(perms)
 
     async def getRolesList(self, userID: str, serverID: str) -> List[Role]:
-        roles = await self.fetch(_UsersSQL.getRoles, userID, serverID)
+        roles = await self._fetch(_UsersSQL.getRoles, userID, serverID)
 
         try:
             return Role.fromListToList(roles)
@@ -277,9 +286,11 @@ class Users(Database):
         except KeyError:
             return []
 
+
 class _ServerSQL:
     createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES ($1, current_time, $2) RETURNING id'
     getServer = 'SELECT * FROM Servers WHERE id = $1'
+
 
 class Servers(Database):
 
@@ -288,13 +299,13 @@ class Servers(Database):
             raise InvalidServerName
 
     async def getServer(self, serverID: str) -> Server:
-        server = await self.fetch(_ServerSQL.getServer, serverID)
+        server = await self._fetch(_ServerSQL.getServer, serverID)
         return Server.fromDict(server[0])
 
     async def createServer(self, userID: str, name: str) -> Server:
         self.validate(name)
 
-        serverID = await self.fetch(_ServerSQL.createServer, userID, name)
+        serverID = await self._fetch(_ServerSQL.createServer, userID, name)
         server = await self.getServer(serverID[0])
 
         return server
