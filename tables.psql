@@ -63,6 +63,7 @@ CREATE TABLE ServerPermissions(
     serverID TEXT NOT NULL,
     admin BOOLEAN NOT NULL,
     addChannels BOOLEAN NOT NULL,
+    assignRoles BOOLEAN NOT NULL,
     kick BOOLEAN NOT NULL,
     ban BOOLEAN NOT NULL,
     changeNick BOOLEAN NOT NULL,
