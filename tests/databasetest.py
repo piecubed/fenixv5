@@ -6,21 +6,15 @@ class UserDatabaseTests(unittest.TestCase):
     
     usersDatabase: Users = Users()
     
-    @asyncTest #type: ignore
-    async def test1(self) -> None:
-        await self.usersDatabase.signUp('test', 'testpassword'.encode('utf-8'), 'test@test.test')
-        
+    async def createDatabase(self) -> None:
+        with open('tables.psql', 'r') as f:
+            await self.usersDatabase._execute(f.read())
+    
     @asyncTest #type: ignore
     async def test2(self) -> None:
-        print('Test2') 
-    
-    @asyncTest #type: ignore
-    async def test3(self) -> None:
-        print('Test3')
-    
-    @asyncTest #type: ignore
-    async def test4(self) -> None:
-        print('Test4') 
+        await self.createDatabase()
+        await self.usersDatabase.signUp('test', 'testpassword'.encode('utf-8'), 'test@test.test')
+
 
 if __name__ == '__main__':
     unittest.main()

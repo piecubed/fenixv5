@@ -1,8 +1,10 @@
+DROP TABLE IF EXISTS Users;
+
 CREATE TABLE Users(
     uid SERIAL PRIMARY KEY UNIQUE,
     username TEXT NOT NULL,
     password BYTEA NOT NULL,
-    email CITEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL UNIQUE,
     salt BYTEA NOT NULL,
     settings JSON,
     token TEXT NOT NULL UNIQUE,
@@ -11,6 +13,8 @@ CREATE TABLE Users(
     verified BOOLEAN NOT NULL
 );
 
+DROP TABLE IF EXISTS Channels;
+
 CREATE TABLE Channels(
     id SERIAL PRIMARY KEY UNIQUE,
     name TEXT NOT NULL,
@@ -18,8 +22,9 @@ CREATE TABLE Channels(
     createdAt TIMESTAMP NOT NULL
 );
 
+DROP TABLE IF EXISTS Servers;
 CREATE TABLE Servers(
-    id SERIAL INT PRIMARY KEY UNIQUE,
+    id SERIAL PRIMARY KEY UNIQUE,
     ownerID TEXT NOT NULL,
     createdAt TIMESTAMP NOT NULL,
     name TEXT NOT NULL,
@@ -27,6 +32,7 @@ CREATE TABLE Servers(
     joinChannel TEXT NOT NULL
 );
 
+DROP TABLE IF EXISTS Messages;
 CREATE TABLE Messages(
     id BOOLEAN PRIMARY KEY UNIQUE,
     channelID TEXT NOT NULL,
@@ -36,12 +42,14 @@ CREATE TABLE Messages(
     stamp TIMESTAMP NOT NULL
 );
 
+DROP TABLE IF EXISTS ServerRegistration;
 CREATE TABLE ServerRegistration(
     userID TEXT NOT NULL,
     serverID TEXT NOT NULL,
     roles TEXT[] NOT NULL
 );
 
+DROP TABLE IF EXISTS Roles;
 CREATE TABLE Roles(
     id SERIAL PRIMARY KEY UNIQUE,
     serverID TEXT NOT NULL,
@@ -49,6 +57,7 @@ CREATE TABLE Roles(
     color TEXT NOT NULL
 );
 
+DROP TABLE IF EXISTS ServerPermissions;
 CREATE TABLE ServerPermissions(
     userID TEXT NOT NULL,
     serverID TEXT NOT NULL,
@@ -61,6 +70,7 @@ CREATE TABLE ServerPermissions(
     mentionEveryone BOOLEAN NOT NULL
 );
 
+DROP TABLE IF EXISTS ChannelPermissions;
 CREATE TABLE ChannelPermissions(
     userID TEXT NOT NULL,
     channelID TEXT NOT NULL,
@@ -69,11 +79,12 @@ CREATE TABLE ChannelPermissions(
     canReadHistory BOOLEAN NOT NULL
 );
 
+DROP TABLE IF EXISTS Bots;
 CREATE TABLE Bots(
     id SERIAL PRIMARY KEY UNIQUE,
     ownerID TEXT NOT NULL,
     createdAt TIMESTAMP NOT NULL,
     username TEXT NOT NULL UNIQUE,
     token TEXT NOT NULL UNIQUE,
-    ownerEmail CITEXT NOT NULL
+    ownerEmail TEXT NOT NULL
 );

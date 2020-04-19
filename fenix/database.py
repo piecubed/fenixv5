@@ -4,6 +4,12 @@ import hashlib
 import secrets
 from typing import Any, Dict, List
 
+try:
+    import fenix.conf as conf
+except ImportError:
+    print('conf.py is required.')
+    exit()
+
 import asyncpg
 from email_validator import EmailNotValidError, validate_email
 
@@ -167,24 +173,24 @@ class Role:
 class Database:
 
     def __init__(self, databaseUrl: str = 'postgresql://piesquared@localhost:5432/fenix') -> None:
-        self._databaseUrl: str = databaseUrl
+        self.__databaseUrl: str = databaseUrl
 
-    _pool: asyncpg.Connection
+    __pool: asyncpg.Connection = None
 
-    async def _connect(self) -> None:
-        self._pool: asyncpg.Connection = await asyncpg.create_pool(self._databaseUrl)
+    async def __connect(self) -> None:
+        self.__pool: asyncpg.Connection = await asyncpg.create_pool(self.__databaseUrl, password=conf.databasePassword)
 
     async def _execute(self, statement: str, *bindings: Any) -> None:
-        if self._pool is None:
-            await self._connect()
+        if self.__pool is None:
+            await self.__connect()
 
-        await self._pool.execute(statement, *bindings) #type: ignore
+        await self.__pool.execute(statement, *bindings) #type: ignore
 
     async def _fetch(self, statement: str, *bindings: Any) -> asyncpg.Record:
+        if self.__pool is None:
+            await self.__connect()
 
-        if self._pool is None:
-            await self._connect()
-        return await self._pool.fetch(statement, *bindings) #type: ignore
+        return await self.__pool.fetch(statement, *bindings) #type: ignore
 
 class _UsersSQL:
     fetchUserByEmail = 'SELECT * FROM Users WHERE email = $1'
@@ -199,10 +205,10 @@ class _UsersSQL:
 class Users(Database):
 
     async def fetchUserByEmail(self, email: str) -> User:
-        query = (await self._fetch(_UsersSQL.fetchUserByEmail))[0]
+        query = (await self._fetch(_UsersSQL.fetchUserByEmail, email))
         try:
-            return User.fromDict(query)
-        except KeyError:
+            return User.fromDict(query[0])
+        except (IndexError, KeyError):
             raise UserNotFound(f'{email} is not registered!')
 
     async def __validate(self, username: str, password: bytes, email: str) -> None:
@@ -226,12 +232,12 @@ class Users(Database):
     async def signUp(self, username: str, password: bytes, email: str) -> User:
         await self.__validate(username, password, email)
 
-        salt = base64.b64encode(secrets.token_hex(32).encode('utf-8'))
-        token = base64.b64encode(secrets.token_hex(128).encode('utf-8')).decode('utf-8')
+        salt = secrets.token_hex(32).encode('utf-8')
+        token = secrets.token_hex(128).encode('utf-8')
         password = AuthUtils.checkPassword(password, salt)
 
-        self._execute(_UsersSQL.signUp, username, password, email, salt, '{}', token)
-
+        await self._execute(_UsersSQL.signUp, username, password, email, salt, '{}', token)
+        
         return await self.fetchUserByEmail(email)
 
     async def signIn(self, email: str, password: str) -> User:
