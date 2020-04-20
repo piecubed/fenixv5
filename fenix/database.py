@@ -18,7 +18,7 @@ from email_validator import EmailNotValidError, validate_email
 
 class User:
 
-    uid: str
+    id: int
     username: str
     password: bytes
     email: str
@@ -44,8 +44,8 @@ class User:
     def checkToken(self, token: str) -> bool:
         return self.token == token
 
-    def isUser(self, uid: str) -> bool:
-        return self.uid == uid
+    def isUser(self, id: int) -> bool:
+        return self.id == id
 
     def __str__(self) -> str:
         return self.username
@@ -53,7 +53,7 @@ class User:
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'User':
         self = cls()
-        self.uid = str(source['uid'])
+        self.id = int(source['uid'])
         self.username = str(source['username'])
         self.password = bytes(source['password'])
         self.email = str(source['email'])
@@ -77,7 +77,7 @@ class AuthUtils:
 
 class Server:
 
-    ID: str
+    ID: int
     name: str
     createdAt: datetime.datetime
     settings: Dict[str, Any]
@@ -85,7 +85,7 @@ class Server:
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Server':
         self = cls()
-        self.ID = str(source['id'])
+        self.ID = int(source['id'])
         self.name = str(source['name'])
         self.createdAt = source['createdat']
         if 'settings' in source.keys():
@@ -101,8 +101,8 @@ class Server:
         return servers
 
     @classmethod
-    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[str, 'Server']:
-        servers: Dict[str, 'Server'] = {}
+    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[int, 'Server']:
+        servers: Dict[int, 'Server'] = {}
         for raw in source:
             server = cls.fromDict(raw)
             servers[server.ID] = server
@@ -143,20 +143,20 @@ class Permission:
 class Role:
     name: str
     color: str
-    id: str
+    id: int
 
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Role':
         self = cls()
         self.name = str(source['name'])
         self.color = str(source['color'])
-        self.id = str(source['id'])
+        self.id = int(source['id'])
 
         return self
 
     @classmethod
-    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[str, 'Role']:
-        roles: Dict[str, 'Role'] = {}
+    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[int, 'Role']:
+        roles: Dict[int, 'Role'] = {}
         for raw in source:
             role = cls.fromDict(raw)
             roles[role.id] = role
@@ -171,7 +171,30 @@ class Role:
 
         return roles
 
-class Database:
+
+class ServerRegistration:
+    userID: int
+    serverID: int
+    roles: List[int]
+
+    @classmethod
+    def fromDict(cls, source: Dict[str, Any]) -> 'ServerRegistration':
+        self = cls()
+        self.userID = int(source['userID'])
+        self.serverID = int(source['serverID'])
+        self.roles = source['roles']
+
+        return self
+
+    @classmethod
+    def fromListToList(cls, source: List[Dict[str, Any]]) -> List['ServerRegistration']:
+        serverRegistration: List['ServerRegistration'] = []
+        for raw in source:
+            serverRegistration.append(cls.fromDict(raw))
+
+        return serverRegistration
+
+class _Database:
 
     def __init__(self, databaseUrl: str = 'postgresql://piesquared@localhost:5432/fenix') -> None:
         self.__databaseUrl: str = databaseUrl
@@ -193,22 +216,24 @@ class Database:
 
         return await self.__pool.fetch(statement, *bindings) #type: ignore
 
-class _UsersSQL:
+class _SQL:
     fetchUserByEmail = 'SELECT * FROM Users WHERE email = $1'
     signUp = 'INSERT INTO Users(username, password, email, salt, token, createdAt, verified) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, TRUE) RETURNING *'
-    getServers = 'SELECT * FROM ServerRegistration INNER JOIN Servers ON ServerRegistration.userID = CAST($1 AS INT)' \
-        'and Servers.id = ServerRegistration.serverID'
+    getServers = 'SELECT * FROM ServerRegistration INNER JOIN Servers ON ServerRegistration.userID = CAST($1 AS INT) and Servers.id = ServerRegistration.serverID'
     signIn = 'SELECT * FROM Users WHERE email = $1 and password = $2'
     getPerms = 'SELECT * FROM ServerPermissions WHERE userID = CAST($1 AS INT) and serverID = CAST($2 AS INT)'
-    getRoles = 'SELECT ServerRegistration.Roles FROM ServerRegistration INNER JOIN Roles ON '\
-        'ServerRegistration.userID = CAST($1 AS INT) AND ServerRegistration.serverID = CAST($2 AS INT) AND Roles.id = ANY(ServerRegistration.roles)'
+    getRoles = 'SELECT ServerRegistration.Roles FROM ServerRegistration INNER JOIN Roles ON ServerRegistration.userID = CAST($1 AS INT) AND ServerRegistration.serverID = CAST($2 AS INT) AND Roles.id = ANY(ServerRegistration.roles)'
     joinServer = 'INSERT INTO ServerRegistration(userID, serverID) VALUES ($1, $2)'
     getServer = 'SELECT * FROM Servers WHERE id = $1'
-
-class Users(Database):
+    joinRole = 'UPDATE ServerRegistration SET Roles = array_append(Roles, $1) WHERE userID = $2 AND serverID = $3 and (SELECT assignRoles FROM ServerPermissions WHERE serverID = $3 and userID = $4) = TRUE'
+    createRole = 'CASE WHEN (SELECT assignRoles FROM ServerPermissions WHERE serverID = $3 and userID = $4) = TRUE THEN INSERT INTO Roles (serverID, name, color) VALUES ($1, $2, $3) '
+    getRole = 'SELECT * FROM Roles WHERE id = $1'
+    createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES (CAST($1 AS INT), CURRENT_TIMESTAMP, $2) RETURNING id'
+    
+class Database(_Database):
 
     async def fetchUserByEmail(self, email: str) -> User:
-        query = await self._fetch(_UsersSQL.fetchUserByEmail, email)
+        query = await self._fetch(_SQL.fetchUserByEmail, email)
         try:
             return User.fromDict(query[0])
         except (IndexError, KeyError):
@@ -239,7 +264,7 @@ class Users(Database):
         token = secrets.token_hex(128)
         hash: bytes = AuthUtils.checkPassword(password.encode('utf-8'), salt)
 
-        user = await self._fetch(_UsersSQL.signUp, username, hash, email, salt, token)
+        user = await self._fetch(_SQL.signUp, username, hash, email, salt, token)
 
         return User.fromDict(user[0])
 
@@ -253,8 +278,8 @@ class Users(Database):
 
         return user
 
-    async def getServers(self, id: str) -> Dict[str, Server]:
-        servers = await self._fetch(_UsersSQL.getServers, id)
+    async def getServers(self, id: int) -> Dict[int, Server]:
+        servers = await self._fetch(_SQL.getServers, id)
 
         try:
             return Server.fromListToDict(servers)
@@ -262,12 +287,12 @@ class Users(Database):
         except KeyError:
             return {}
 
-    async def getPerms(self, userID: str, serverID: str) -> Dict[int, Permission]:
-        perms = await self._fetch(_UsersSQL.getPerms, userID, serverID)
+    async def getPerms(self, userID: int, serverID: int) -> Dict[int, Permission]:
+        perms = await self._fetch(_SQL.getPerms, userID, serverID)
         return Permission.fromListToDict(perms)
 
-    async def getRoles(self, userID: str, serverID: str) -> Dict[str, Role]:
-        roles = await self._fetch(_UsersSQL.getRoles, userID, serverID)
+    async def getRoles(self, userID: int, serverID: int) -> Dict[int, Role]:
+        roles = await self._fetch(_SQL.getRoles, userID, serverID)
 
         try:
             return Role.fromListToDict(roles)
@@ -275,8 +300,8 @@ class Users(Database):
         except KeyError:
             return {}
 
-    async def getServersList(self, id: str) -> List[Server]:
-        servers = await self._fetch(_UsersSQL.getServers, id)
+    async def getServersList(self, id: int) -> List[Server]:
+        servers = await self._fetch(_SQL.getServers, id)
 
         try:
             return Server.fromListToList(servers)
@@ -284,12 +309,12 @@ class Users(Database):
         except KeyError:
             return []
 
-    async def getPermsList(self, userID: str, serverID: str) -> List[Permission]:
-        perms = await self._fetch(_UsersSQL.getPerms, userID, serverID)
+    async def getPermsList(self, userID: int, serverID: int) -> List[Permission]:
+        perms = await self._fetch(_SQL.getPerms, userID, serverID)
         return Permission.fromListToList(perms)
 
-    async def getRolesList(self, userID: str, serverID: str) -> List[Role]:
-        roles = await self._fetch(_UsersSQL.getRoles, userID, serverID)
+    async def getRolesList(self, userID: int, serverID: int) -> List[Role]:
+        roles = await self._fetch(_SQL.getRoles, userID, serverID)
 
         try:
             return Role.fromListToList(roles)
@@ -297,34 +322,29 @@ class Users(Database):
         except KeyError:
             return []
 
-    async def joinServer(self, userID: str, serverID: str) -> Server:
-        await self._execute(_UsersSQL.joinServer, userID, serverID)
-        server = await self._fetch(_UsersSQL.getServer, int(serverID))
+    async def joinServer(self, userID: int, serverID: int) -> Server:
+        await self._execute(_SQL.joinServer, userID, serverID)
+        server = await self._fetch(_SQL.getServer, int(serverID))
 
         return Server.fromDict(server[0])
 
-    async def joinRole(self, userID: str, serverID: str, roleID: str) -> Role:
-        raise NotImplementedError
-
-class _ServerSQL:
-    createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES (CAST($1 AS INT), CURRENT_TIMESTAMP, $2) RETURNING id'
-    getServer = 'SELECT * FROM Servers WHERE id = CAST($1 AS INT)'
-
-
-class Servers(Database):
-
+    async def joinRole(self, userID: int, serverID: int, roleID: int, actor: int) -> Role:
+        await self._execute(_SQL.joinRole, roleID, userID, serverID)
+        role = await self._fetch(_SQL.getRole, roleID)
+        return Role.fromDict(role)
+    
     def validate(self, name: str) -> None:
         if len(name) > 40:
             raise InvalidServerName
 
     async def getServer(self, serverID: str) -> Server:
-        server = await self._fetch(_ServerSQL.getServer, serverID)
+        server = await self._fetch(_SQL.getServer, serverID)
         return Server.fromDict(server[0])
 
     async def createServer(self, userID: str, name: str) -> Server:
         self.validate(name)
 
-        serverID = await self._fetch(_ServerSQL.createServer, int(userID), name)
+        serverID = await self._fetch(_SQL.createServer, int(userID), name)
         server = await self.getServer(serverID[0]['id'])
 
         return server
