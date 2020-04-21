@@ -6,7 +6,7 @@
 #
 
 import copy
-from typing import Any, Dict, Iterable, Iterator, List, Union
+from typing import Any, Dict, Iterable, Iterator, List, Union, get_type_hints
 
 class _AutoSlotsMeta(type):
     """
@@ -23,8 +23,13 @@ class _AutoSlotsMeta(type):
                     if var in d:
                         break
                 else:
-                    d['__slots__'] = tuple(annotations)
-        return super().__new__(cls, *args)
+                    d['__slots__'] = tuple(i for i in annotations
+                                           if not i.startswith('_'))
+        res = super().__new__(cls, *args)
+        hints = get_type_hints(res)
+        hints = {k: v for k, v in hints.items() if not k.startswith('_')}
+        res._BaseMessage__annotations = hints # type: ignore
+        return res
 
 def _isinstance(obj: Any, typ: Any) -> bool:
     """
@@ -68,9 +73,10 @@ class BaseMessage(metaclass=_AutoSlotsMeta):
     Creates a message class.
     """
 
+    __annotations: Dict[str, Any]
     def __init__(self, data: Dict[Any, Any]) -> None:
         assert isinstance(data, dict)
-        for attr, attr_type in self.__annotations__.items():
+        for attr, attr_type in self.__annotations.items():
             if attr not in data:
                 if not hasattr(self, attr):
                     raise KeyError(attr)
@@ -83,6 +89,5 @@ class BaseMessage(metaclass=_AutoSlotsMeta):
             setattr(self, attr, value)
 
     def __iter__(self) -> Iterator[Any]:
-        cls = self.__class__
-        for attr in getattr(cls, '__slots__', cls.__annotations__):
+        for attr in self.__class__.__annotations:
             yield getattr(self, attr)
