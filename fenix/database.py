@@ -108,38 +108,7 @@ class Server:
             servers[server.ID] = server
 
         return servers
-
-
-class Permission:
-    name: str
-    id: int
-
-    @classmethod
-    def fromDict(cls, source: Dict[str, Any]) -> 'Permission':
-        self = cls()
-        self.name = str(source['name'])
-        self.id = int(source['id'])
-
-        return self
-
-    @classmethod
-    def fromListToList(cls, source: List[Dict[str, Any]]) -> List['Permission']:
-        permissions: List['Permission'] = []
-        for raw in source:
-            permissions.append(cls.fromDict(raw))
-
-        return permissions
-
-    @classmethod
-    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[int, 'Permission']:
-        permissions: Dict[int, 'Permission'] = {}
-        for raw in source:
-            permission = cls.fromDict(raw)
-            permissions[permission.id] = permission
-
-        return permissions
-
-
+        
 class Role:
     name: str
     color: str
@@ -176,14 +145,26 @@ class ServerRegistration:
     userID: int
     serverID: int
     roles: List[int]
-
+    admin: bool
+    addChannels: bool
+    assignRoles: bool
+    kick: bool
+    ban: bool
+    changeNick: bool
+    changeOthersNick: bool
+    
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'ServerRegistration':
         self = cls()
         self.userID = int(source['userID'])
         self.serverID = int(source['serverID'])
         self.roles = source['roles']
-
+        self.addChannels = source['addChannels']
+        self.assignRoles = source['assignRoles']
+        self.kick = source['kick']
+        self.ban = source['ban']
+        self.changeNick = source['changeNick']
+        self.changeOthersNick = source['changeOthersNick']
         return self
 
     @classmethod
@@ -193,7 +174,34 @@ class ServerRegistration:
             serverRegistration.append(cls.fromDict(raw))
 
         return serverRegistration
-
+    
+class ChannelPermissions:
+    userID: int
+    channelID: int
+    canRead: bool
+    canTalk: bool
+    canReadHistory: bool
+    canDeleteMessages: bool
+    canManageChannel: bool
+    canManagePermissions: bool
+    canPinMessages: bool
+    canMentionEveryone: bool
+    
+    @classmethod
+    def fromDict(cls, source: Dict[str, Any]) -> 'ChannelPermissions':
+        self = cls()
+        self.userID = source['userID']
+        self.channelID = source['channelID']
+        self.canRead = source['canRead']
+        self.canTalk = source['canTalk']
+        self.canReadHistory = source['canReadHistory']
+        self.canDeleteMessages = source['canDeleteMessages']
+        self.canManageChannel = source['canManageChannel']
+        self.canManagePermissions = source['canManagePermissions']
+        self.canPinMessages = source['canPinMessages']
+        self.canMentionEveryone = source['canMentionEveryone']
+        return self
+    
 class _Database:
 
     def __init__(self, databaseUrl: str = 'postgresql://piesquared@localhost:5432/fenix') -> None:
@@ -221,15 +229,43 @@ class _SQL:
     signUp = 'INSERT INTO Users(username, password, email, salt, token, createdAt, verified) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, TRUE) RETURNING *'
     getServers = 'SELECT * FROM ServerRegistration INNER JOIN Servers ON ServerRegistration.userID = CAST($1 AS INT) and Servers.id = ServerRegistration.serverID'
     signIn = 'SELECT * FROM Users WHERE email = $1 and password = $2'
-    getPerms = 'SELECT * FROM ServerPermissions WHERE userID = CAST($1 AS INT) and serverID = CAST($2 AS INT)'
+    getPerms = 'SELECT * FROM ServerRegistration WHERE userID = CAST($1 AS INT) and serverID = CAST($2 AS INT)'
     getRoles = 'SELECT ServerRegistration.Roles FROM ServerRegistration INNER JOIN Roles ON ServerRegistration.userID = CAST($1 AS INT) AND ServerRegistration.serverID = CAST($2 AS INT) AND Roles.id = ANY(ServerRegistration.roles)'
     joinServer = 'INSERT INTO ServerRegistration(userID, serverID) VALUES ($1, $2)'
     getServer = 'SELECT * FROM Servers WHERE id = $1'
-    joinRole = 'UPDATE ServerRegistration SET Roles = array_append(Roles, $1) WHERE userID = $2 AND serverID = $3 and (SELECT assignRoles FROM ServerPermissions WHERE serverID = $3 and userID = $4) = TRUE'
-    createRole = 'CASE WHEN (SELECT assignRoles FROM ServerPermissions WHERE serverID = $3 and userID = $4) = TRUE THEN INSERT INTO Roles (serverID, name, color) VALUES ($1, $2, $3) '
+    joinRole = 'UPDATE ServerRegistration SET Roles = array_append(Roles, $1) WHERE userID = $2 AND serverID = $3 and (SELECT assignRoles FROM ServerRegistration WHERE serverID = $3 and userID = $4) = TRUE'
+    createRole = 'CASE WHEN (SELECT assignRoles FROM ServerRegistration WHERE serverID = $3 and userID = $4) = TRUE THEN INSERT INTO Roles (serverID, name, color) VALUES ($1, $2, $3) '
     getRole = 'SELECT * FROM Roles WHERE id = $1'
     createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES (CAST($1 AS INT), CURRENT_TIMESTAMP, $2) RETURNING id'
-    
+    addChannels = 'SELECT addChannels FROM ServerRegistration WHERE userID = $1 and serverID = $2'
+    assignRoles = 'SELECT assignRoles FROM ServerRegistration WHERE userID = $1 and serverID = $2'
+    kick = 'SELECT kick FROM ServerRegistration WHERE userID = $1 and serverID = $2'
+    ban = 'SELECT ban FROM ServerRegistration WHERE userID = $1 and serverID = $2'
+    changeNick = 'SELECT changeNick FROM ServerRegistration WHERE userID = $1 and serverID = $2'
+    changeOthersNick = 'SELECT changeOthersNick FROM ServerRegistration WHERE userID = $1 and serverID = $2'
+    canRead = 'SELECT canRead FROM ChannelPermissions WHERE userID = $1 and channelID = $2'
+    canTalk = 'SELECT canTalk FROM ChannelPermissions WHERE userID = $1 and channelID = $2'
+    canReadHistory = 'SELECT canReadHistory FROM ChannelPermissions WHERE userID = $1 and channelID = $2'
+    canDeleteMessages = 'SELECT canDeleteMessages FROM ChannelPermissions WHERE userID = $1 and channelID = $2'
+    canManageChannel = 'SELECT canManageChannel FROM ChannelPermissions WHERE userID = $1 and channelID = $2'
+    canManagePermissions = 'SELECT canManagePermissions FROM ChannelPermissions WHERE userID = $1 and channelID = $2'
+    canPinMessages = 'SELECT canPinMessages FROM ChannelPermissions WHERE userID = $1 and channelID = $2'
+    canMentionEveryone = 'SELECT canMentionEveryone FROM ChannelPermissions WHERE userID = $1 and channelID = $2'
+    letAddChannels = 'UPDATE ServerRegistration SET addChannels = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letAssignRoles = 'UPDATE ServerRegistration SET assignRoles = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letKick = 'UPDATE ServerRegistration SET kick = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letBan = 'UPDATE ServerRegistration SET ban = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letChangeNick = 'UPDATE ServerRegistration SET changeNick = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letChangeOthersNick = 'UPDATE ServerRegistration SET changeOthersNick = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letRead = 'UPDATE ServerRegistration SET canRead = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letTalk = 'UPDATE ServerRegistration SET canTalk = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letReadHistory = 'UPDATE ServerRegistration SET canReadHistory = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letDeleteMessages = 'UPDATE ServerRegistration SET canDeleteMessages = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letManageChannel = 'UPDATE ServerRegistration SET canManageChannel = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letManagePermissions = 'UPDATE ServerRegistration SET canManagePermissions = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letPinMessages = 'UPDATE ServerRegistration SET canPinMessages = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+    letPingEveryone = 'UPDATE ServerRegistration SET canMentionEveryone = $1 WHERE userID = $2 and serverID = $3 RETURNING *'
+
 class Database(_Database):
 
     async def fetchUserByEmail(self, email: str) -> User:
@@ -287,9 +323,9 @@ class Database(_Database):
         except KeyError:
             return {}
 
-    async def getPerms(self, userID: int, serverID: int) -> Dict[int, Permission]:
+    async def getPerms(self, userID: int, serverID: int) -> ServerRegistration:
         perms = await self._fetch(_SQL.getPerms, userID, serverID)
-        return Permission.fromListToDict(perms)
+        return ServerRegistration.fromDict(perms)
 
     async def getRoles(self, userID: int, serverID: int) -> Dict[int, Role]:
         roles = await self._fetch(_SQL.getRoles, userID, serverID)
@@ -309,9 +345,9 @@ class Database(_Database):
         except KeyError:
             return []
 
-    async def getPermsList(self, userID: int, serverID: int) -> List[Permission]:
+    async def getPermsList(self, userID: int, serverID: int) -> List[ServerRegistration]:
         perms = await self._fetch(_SQL.getPerms, userID, serverID)
-        return Permission.fromListToList(perms)
+        return ServerRegistration.fromListToList(perms)
 
     async def getRolesList(self, userID: int, serverID: int) -> List[Role]:
         roles = await self._fetch(_SQL.getRoles, userID, serverID)
@@ -337,18 +373,110 @@ class Database(_Database):
         if len(name) > 40:
             raise InvalidServerName
 
-    async def getServer(self, serverID: str) -> Server:
+    async def getServer(self, serverID: int) -> Server:
         server = await self._fetch(_SQL.getServer, serverID)
         return Server.fromDict(server[0])
 
-    async def createServer(self, userID: str, name: str) -> Server:
+    async def createServer(self, userID: int, name: str) -> Server:
         self.validate(name)
 
         serverID = await self._fetch(_SQL.createServer, int(userID), name)
         server = await self.getServer(serverID[0]['id'])
 
         return server
+    
+    async def addChannels(self, userID: int, serverID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.addChannels, userID, serverID, permission))
 
+    async def kick(self, userID: int, serverID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.kick, userID, serverID, permission))
+    
+    async def ban(self, userID: int, serverID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.ban, userID, serverID, permission))
+
+    async def changeNick(self, userID: int, serverID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.changeNick, userID, serverID, permission))
+    
+    async def changeOthersNick(self, userID: int, serverID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.changeOthersNick, userID, serverID, permission))
+    
+    async def canRead(self, userID: int, channelID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.canRead, userID, channelID, permission))
+    
+    async def canTalk(self, userID: int, channelID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.canTalk, userID, channelID, permission))
+    
+    async def canReadHistory(self, userID: int, channelID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.canReadHistory, userID, channelID, permission))
+    
+    async def canDeleteMessages(self, userID: int, channelID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.canDeleteMessages, userID, channelID, permission))
+    
+    async def canManageChannel(self, userID: int, channelID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.canManageChannel, userID, channelID, permission))
+    
+    async def canManagePermissions(self, userID: int, channelID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.canManagePermissions, userID, channelID, permission))
+    
+    async def canPinMessages(self, userID: int, channelID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.canPinMessages, userID, channelID, permission))
+    
+    async def canMentionEveryone(self, userID: int, channelID: int, permission: str) -> bool:
+        return bool(self._fetch(_SQL.canMentionEveryone, userID, channelID, permission))
+
+    async def changeAddChannels(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letAddChannels, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changeAssignRoles(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letAssignRoles, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changeKick(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letKick, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changeBan(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letBan, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changeChangeNick(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letChangeNick, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changeChangeOthersNick(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letChangeOthersNick, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changeRead(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letRead, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changeTalk(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letTalk, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changeReadHistory(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letReadHistory, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changeDeleteMessages(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letDeleteMessages, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changeManageChannel(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letManageChannel, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changePinMessages(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letPinMessages, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+    
+    async def changePingEveryone(self, value: bool, userID: int, serverID: int) -> List[ServerRegistration]:
+        permissions = await self._fetch(_SQL.letPingEveryone, value, userID, serverID)
+        return ServerRegistration.fromListToList(permissions[0])
+
+   
 class InvalidServerName(Exception):
     pass
 

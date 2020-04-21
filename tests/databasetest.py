@@ -24,11 +24,11 @@ class UserDatabaseTests(unittest.TestCase):
     
     @asyncTest #type: ignore
     async def test4(self) -> None:
-        await self.serversDatabase.createServer('1', 'Test')
+        await self.database.createServer(1, 'Test')
     
     @asyncTest #type: ignore
     async def test5(self) -> None:
-        await self.database.joinServer('1', '1')
+        await self.database.joinServer(1, 1)
         await self.createDatabase()
         
 if __name__ == '__main__':
