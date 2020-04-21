@@ -18,7 +18,7 @@ class ProtocolCoreTest(unittest.TestCase):
             _ignore_me: bool
             c: typing.List['int']
 
-        self.assertEqual(Test.__slots__, ('a', 'b', 'c'))
+        self.assertEqual(Test.__slots__, ('a', 'b', '_ignore_me', 'c'))
         self.assertEqual(Test._BaseMessage__annotations, { # type: ignore
             'a': int,
             'b': str,

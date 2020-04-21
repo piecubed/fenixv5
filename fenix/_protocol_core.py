@@ -23,8 +23,7 @@ class _AutoSlotsMeta(type):
                     if var in d:
                         break
                 else:
-                    d['__slots__'] = tuple(i for i in annotations
-                                           if not i.startswith('_'))
+                    d['__slots__'] = tuple(annotations)
         res = super().__new__(cls, *args)
         hints = get_type_hints(res)
         hints = {k: v for k, v in hints.items() if not k.startswith('_')}
