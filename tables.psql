@@ -44,16 +44,16 @@ CREATE TABLE Messages(
 
 DROP TABLE IF EXISTS ServerRegistration;
 CREATE TABLE ServerRegistration(
-    userID TEXT NOT NULL,
-    serverID TEXT NOT NULL,
-    roles TEXT[] NOT NULL DEFAULT '{}'
-    admin BOOLEAN NOT NULL,
-    addChannels BOOLEAN NOT NULL,
-    assignRoles BOOLEAN NOT NULL,
-    kick BOOLEAN NOT NULL,
-    ban BOOLEAN NOT NULL,
-    changeNick BOOLEAN NOT NULL,
-    changeOthersNick BOOLEAN NOT NULL,
+    userID INT NOT NULL,
+    serverID INT NOT NULL,
+    roles TEXT[] NOT NULL DEFAULT '{}',
+    admin BOOLEAN NOT NULL DEFAULT FALSE,
+    addChannels BOOLEAN NOT NULL DEFAULT FALSE,
+    assignRoles BOOLEAN NOT NULL DEFAULT FALSE,
+    kick BOOLEAN NOT NULL DEFAULT FALSE,
+    ban BOOLEAN NOT NULL DEFAULT FALSE,
+    changeNick BOOLEAN NOT NULL DEFAULT TRUE,
+    changeOthersNick BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 DROP TABLE IF EXISTS Roles;
