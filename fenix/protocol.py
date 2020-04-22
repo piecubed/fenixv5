@@ -1,4 +1,8 @@
-# Example code
+#
+# Fenix protocol messages
+#
+# © Copyright 2020 by luk3yx and piesquared
+#
 
 # Optional __future__ import for testing
 from __future__ import annotations

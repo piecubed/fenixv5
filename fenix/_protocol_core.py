@@ -2,7 +2,7 @@
 #
 # Protocol message helpers
 #
-# Copyright © 2020 by luk3yx
+# Copyright © 2020 by luk3yx and piesquared
 #
 
 import copy
