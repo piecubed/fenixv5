@@ -40,8 +40,7 @@ CREATE TABLE Messages(
     contents TEXT NOT NULL,
     stamp TIMESTAMP NOT NULL,
     pinned BOOLEAN NOT NULL DEFAULT FALSE,
-    reactions JSON NOT NULL DEFAULT '{}',
-
+    reactions JSON NOT NULL DEFAULT '{}'
 );
 
 DROP TABLE IF EXISTS Reactions;
@@ -88,7 +87,7 @@ CREATE TABLE ChannelPermissions(
     canManageChannel BOOLEAN NOT NULL DEFAULT FALSE,
     canManagePermissions BOOLEAN NOT NULL DEFAULT FALSE,
     canPinMessages BOOLEAN NOT NULL DEFAULT FALSE,
-    canMentionEveryone BOOLEAN NOT NULL DEFAULT FALSE,
+    canMentionEveryone BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 DROP TABLE IF EXISTS Bots;
