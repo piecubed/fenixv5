@@ -1,7 +1,7 @@
 DROP TABLE IF EXISTS Users;
 
 CREATE TABLE Users(
-    uid SERIAL PRIMARY KEY UNIQUE,
+    uid SERIAL PRIMARY KEY,
     username TEXT NOT NULL,
     password BYTEA NOT NULL,
     email TEXT NOT NULL UNIQUE,
@@ -16,7 +16,7 @@ CREATE TABLE Users(
 DROP TABLE IF EXISTS Channels;
 
 CREATE TABLE Channels(
-    id SERIAL PRIMARY KEY UNIQUE,
+    id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     serverID TEXT NOT NULL,
     createdAt TIMESTAMP NOT NULL
@@ -24,7 +24,7 @@ CREATE TABLE Channels(
 
 DROP TABLE IF EXISTS Servers;
 CREATE TABLE Servers(
-    id SERIAL PRIMARY KEY UNIQUE,
+    id SERIAL PRIMARY KEY,
     ownerID TEXT NOT NULL,
     createdAt TIMESTAMP NOT NULL,
     name TEXT NOT NULL,
@@ -34,12 +34,22 @@ CREATE TABLE Servers(
 
 DROP TABLE IF EXISTS Messages;
 CREATE TABLE Messages(
-    id BOOLEAN PRIMARY KEY UNIQUE,
-    channelID TEXT NOT NULL,
-    userID TEXT NOT NULL,
-    serverID TEXT NOT NULL,
+    id SERIAL PRIMARY KEY,
+    channelID INT NOT NULL,
+    userID INT NOT NULL,
     contents TEXT NOT NULL,
-    stamp TIMESTAMP NOT NULL
+    stamp TIMESTAMP NOT NULL,
+    pinned BOOLEAN NOT NULL DEFAULT FALSE,
+    reactions JSON NOT NULL DEFAULT '{}',
+
+);
+
+DROP TABLE IF EXISTS Reactions;
+CREATE TABLE Reactions(
+    id SERIAL PRIMARY KEY,
+    unicode TEXT NOT NULL,
+    messageID INT NOT NULL,
+    users INT[] NOT NULL
 );
 
 DROP TABLE IF EXISTS ServerRegistration;
@@ -58,7 +68,7 @@ CREATE TABLE ServerRegistration(
 
 DROP TABLE IF EXISTS Roles;
 CREATE TABLE Roles(
-    id SERIAL PRIMARY KEY UNIQUE,
+    id SERIAL PRIMARY KEY,
     serverID TEXT NOT NULL,
     name TEXT NOT NULL,
     color TEXT NOT NULL
@@ -70,15 +80,20 @@ DROP TABLE IF EXISTS ChannelPermissions;
 CREATE TABLE ChannelPermissions(
     userID INT NOT NULL,
     channelID INT NOT NULL,
-    canRead BOOLEAN NOT NULL,
-    canTalk BOOLEAN NOT NULL,
-    canReadHistory BOOLEAN NOT NULL,
-    canDeleteMessages BOOLEAN NOT NULL
+    canRead BOOLEAN NOT NULL DEFAULT TRUE,
+    canTalk BOOLEAN NOT NULL DEFAULT TRUE,
+    canReadHistory BOOLEAN NOT NULL DEFAULT TRUE,
+    canDeleteMessages BOOLEAN NOT NULL DEFAULT FALSE,
+    canAddReactions BOOLEAN NOT NULL DEFAULT FALSE,
+    canManageChannel BOOLEAN NOT NULL DEFAULT FALSE,
+    canManagePermissions BOOLEAN NOT NULL DEFAULT FALSE,
+    canPinMessages BOOLEAN NOT NULL DEFAULT FALSE,
+    canMentionEveryone BOOLEAN NOT NULL DEFAULT FALSE,
 );
 
 DROP TABLE IF EXISTS Bots;
 CREATE TABLE Bots(
-    id SERIAL PRIMARY KEY UNIQUE,
+    id SERIAL PRIMARY KEY,
     ownerID TEXT NOT NULL,
     createdAt TIMESTAMP NOT NULL,
     username TEXT NOT NULL UNIQUE,

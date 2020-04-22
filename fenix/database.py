@@ -188,6 +188,7 @@ class ChannelPermissions:
     canManagePermissions: bool
     canPinMessages: bool
     canMentionEveryone: bool
+    canAddReactions: bool
     
     whitelist: Tuple[str, ...] = ('canRead', 'canTalk', 'canReadHistory', 'canDeleteMessages', 'canManageChannel', 'canPinMessages', 'canMentionEveryone')
     @classmethod
@@ -203,8 +204,41 @@ class ChannelPermissions:
         self.canManagePermissions = source['canManagePermissions']
         self.canPinMessages = source['canPinMessages']
         self.canMentionEveryone = source['canMentionEveryone']
+        self.canAddReactions = source['canAddReactions']
         return self
+
+class Message:
+    userID: int
+    channelID: int
+    content: str
+    timestamp: datetime.datetime
+    pinned: bool
+    reactions: List[int]
     
+    @classmethod
+    def fromDict(cls, source: Dict[str, Any]) -> 'Message':
+        self = cls()
+        self.userID = source['userID']
+        self.channelID = source['channelID']
+        self.content = source['content']
+        self.timestamp = source['timestamp']
+        self.pinned = source['timestamp']
+        self.reactions = source['reactions']
+        return self
+
+class Reaction:
+    id: int
+    unicode: str
+    users: List[int]
+
+    @classmethod
+    def fromDict(cls, source: Dict[str, Any]) -> 'Reaction':
+        self = cls()
+        self.id = source['id']
+        self.unicode = source['unicode']
+        self.users = source['users']
+        return self
+
 class _Database:
 
     def __init__(self, databaseUrl: str = 'postgresql://piesquared@localhost:5432/fenix') -> None:
@@ -237,13 +271,27 @@ class _SQL:
     joinServer = 'INSERT INTO ServerRegistration(userID, serverID) VALUES ($1, $2)'
     getServer = 'SELECT * FROM Servers WHERE id = $1'
     joinRole = 'UPDATE ServerRegistration SET Roles = array_append(Roles, $1) WHERE userID = $2 AND serverID = $3 and (SELECT assignRoles FROM ServerRegistration WHERE serverID = $3 and userID = $4) = TRUE'
-    createRole = 'CASE WHEN (SELECT assignRoles FROM ServerRegistration WHERE serverID = $3 and userID = $4) = TRUE THEN INSERT INTO Roles (serverID, name, color) VALUES ($1, $2, $3) '
+    createRole = 'CASE WHEN (SELECT assignRoles FROM ServerRegistration WHERE serverID = $3 and userID = $4) = TRUE THEN INSERT INTO Roles (serverID, name, color) VALUES ($1, $2, $3)'
     getRole = 'SELECT * FROM Roles WHERE id = $1'
     createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES (CAST($1 AS INT), CURRENT_TIMESTAMP, $2) RETURNING id'
     changeChannelPermission = 'UPDATE ChannelPermissions SET $1 = $2 WHERE userID = $3 and channelID = $4 AND (SELECT canManageServer FROM ChannelPermissions WHERE channelID = $4 and userID = $5) RETURNING *'
     changeServerPermission = 'UPDATE ServerRegistration SET $1 = $2 WHERE userID = $3 and serverID = $4 AND (SELECT canManageServer FROM ServerRegistration WHERE serverID = $4 and userID = $5) RETURNING *'
     hasChannelPermission = 'SELECT $1 FROM ChannelPermissions WHERE userID = $2 and channelID = $3'
     hasServerPermission = 'SELECT $1 FROM ServerRegistration WHERE userID = $2 and serverID = $3'
+    sendMessage = 'CASE WHEN (SELECT canTalk from ChannelPermissions WHERE channelID = $1 AND userID = $2) THEN INSERT INTO Messages (channelID, userID, contents, stamp) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING * '
+    editMessage = 'CASE WHEN (SELECT canTalk from ChannelPermissions WHERE channelID = $4 AND userID = $3) THEN UPDATE Messages SET contents = $1 WHERE id = $2 and userID = $3 RETURNING *'
+    deleteMessage = 'DELETE Messages WHERE id = $1 AND userID = $2'
+    # 1: messageID, 2 userID 3 channelID 4 unicode
+    addReaction = '''CASE WHEN (SELECT canAddReactions from ChannelPermissions WHERE channelID = $3 AND userID = $2) AND 
+                    (SELECT canTalk from ChannelPermissions WHERE channelID = $3 AND userID = $2) THEN CASE WHEN (ARRAY_LENGTH(
+                    (SELECT reactions FROM Messages WHERE messageID = $1)) = 0) THEN UPDATE Messages SET reactions ARRAY_APPEND(
+                    reactions, (INSERT INTO Reactions(unicode, messageID, users) 
+                    VALUES ($4, $1, {$2}) RETURNING id)) WHERE id = $1 AND userID = $2 RETURN * ELSE UPDATE Messages SET reactions
+                    ARRAY_APPEND(reactions, (SELECT id FROM Reactions WHERE messageID = $1) WHERE id = $1 AND userID = $2 RETURN *'''
+                    
+    pinMessage = 'CASE WHEN (SELECT canTalk from ChannelPermissions WHERE channelID = $1 AND userID = $2) THEN UPDATE Messages SET pinned = $1 WHERE id = $2 AND userID = $3 RETURN *'
+    removeReaction1 = '''UPDATE Messages SET ARRAY_REMOVE(reactions, $1) WHERE id = (SELECT messageID FROM Reactions WHERE id = $1)'''
+    removeReaction2 = '''DELETE Reactions WHERE id = $1'''
     
 class Database(_Database):
 
@@ -401,6 +449,37 @@ class Database(_Database):
             raise ActorNotAuthorized
 
         return ServerRegistration.fromDict(permissions[0])
+    
+    async def sendMessage(self, content: str, userID: int, channelID: int) -> Message:
+        if len(content) >= 1000:
+            raise MessageTooLong
+        message = await self._fetch(_SQL.sendMessage, channelID, userID, content)
+        return Message.fromDict(message[0])
+    
+    async def editMessage(self, messageID: int, userID: int, content: str) -> Message:
+        if len(content) >= 1000:
+            raise MessageTooLong
+        
+        message = await self._fetch(_SQL.editMessage, content, messageID, userID)
+        return Message.fromDict(message[0])
+    
+    async def deleteMessage(self, messageID: int, userID: int) -> None:
+        await self._execute(_SQL.deleteMessage, messageID, userID)
+    
+    async def addReaction(self, messageID: int, userID: int, channelID: int, unicode: str) -> Message:
+        message = await self._fetch(_SQL.addReaction, messageID, userID, channelID, unicode)
+        
+        return Message.fromDict(message[0])
+    
+    async def removeReaction(self, reactionID: int) -> None:
+        await self._execute(_SQL.removeReaction1, reactionID)
+        await self._execute(_SQL.removeReaction2, reactionID)
+        
+class CannotTalk(Exception):
+    pass
+
+class MessageTooLong(Exception):
+    pass
 
 class InvalidServerName(Exception):
     pass
