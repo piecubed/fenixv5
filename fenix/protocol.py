@@ -7,56 +7,57 @@
 # Optional __future__ import for testing
 from __future__ import annotations
 
-from fenix import _protocol_core
 from typing import Dict, Type, Union
 
+from fenix import _protocolCore
 
-class BaseProtocol(_protocol_core.BaseMessage):
+
+class BaseProtocol(_protocolCore.BaseMessage):
     async def process(self) -> None:
         pass
 
-_incoming_messages = _protocol_core.ProtocolHelper()
+incomingMessages = _protocolCore.ProtocolHelper()
 
-@_incoming_messages.add('captcha')
+@incomingMessages.add('captcha')
 class _Captcha(BaseProtocol):
     link: str # Original link to captcha
     text: str # Completed text
 
-@_incoming_messages.add('channelCreate')
+@incomingMessages.add('channelCreate')
 class _ChannelCreate(BaseProtocol):
     channel: str
     server: int
 
-@_incoming_messages.add('login')
+@incomingMessages.add('login')
 class _Login(BaseProtocol):
     email: str
     password: str
 
-@_incoming_messages.add('loginBot')
+@incomingMessages.add('loginBot')
 class _LoginBot(BaseProtocol):
     token: str
 
-@_incoming_messages.add('message')
+@incomingMessages.add('message')
 class _Message(BaseProtocol):
     channel_id: int
     message: str
 
-@_incoming_messages.add('register')
+@incomingMessages.add('register')
 class _Register(BaseProtocol):
     email: str
     username: str
     password: str
 
-@_incoming_messages.add('registerBot')
+@incomingMessages.add('registerBot')
 class _RegisterBot(BaseProtocol):
     name: str
     parent_email: str
     parent_password: str
 
-@_incoming_messages.add('verify')
+@incomingMessages.add('verify')
 class _Verify(BaseProtocol):
     code: str
 
-@_incoming_messages.add('version')
+@incomingMessages.add('version')
 class _Version(BaseProtocol):
     pass

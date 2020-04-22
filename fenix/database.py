@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+#
+# Protocol message helpers
+#
+# Copyright © 2020 by piesquared and luk3yx
+#
+
 import base64
 import datetime
 import hashlib
@@ -12,8 +19,6 @@ except ImportError:
 
 import asyncpg
 from email_validator import EmailNotValidError, validate_email
-
-# These are basically headers, since annotations are parsed weird
 
 
 class User:
