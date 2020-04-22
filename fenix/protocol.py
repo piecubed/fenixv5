@@ -25,7 +25,7 @@ class _Captcha(BaseProtocol):
 
 @incomingMessages.add('channelCreate')
 class _ChannelCreate(BaseProtocol):
-    channel: str
+    channel: int
     server: int
 
 @incomingMessages.add('login')
@@ -39,7 +39,7 @@ class _LoginBot(BaseProtocol):
 
 @incomingMessages.add('message')
 class _Message(BaseProtocol):
-    channel_id: int
+    channelID: int
     message: str
 
 @incomingMessages.add('register')
