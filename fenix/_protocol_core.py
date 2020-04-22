@@ -6,7 +6,8 @@
 #
 
 import copy
-from typing import Any, Dict, Iterable, Iterator, List, Union, get_type_hints
+from typing import (Any, Callable, Dict, Iterable, Iterator, List, Optional,
+                    Type, Union, get_type_hints)
 
 class _AutoSlotsMeta(type):
     """
@@ -90,3 +91,34 @@ class BaseMessage(metaclass=_AutoSlotsMeta):
     def __iter__(self) -> Iterator[Any]:
         for attr in self.__class__.__annotations:
             yield getattr(self, attr)
+
+class ProtocolHelper:
+    __slots__ = ('types',)
+    def __init__(self) -> None:
+        self.types: Dict[str, Type[BaseMessage]] = {}
+
+    def add(self, *names: str) -> Callable[[Type[BaseMessage]],
+            Type[BaseMessage]]:
+        """
+        A decorator to add packet types.
+        @protocolHelper.add('hello')
+        class _Hello(BaseMessage):
+            world: str
+        """
+        def wrapper(cls: Type[BaseMessage]) -> Type[BaseMessage]:
+            for name in names:
+                self.types[name] = cls
+            return cls
+        return wrapper
+
+    def get(self, packet: Dict[Any, Any]) -> Optional[BaseMessage]:
+        """
+        Gets a packet object of the correct type for a certain packet. Returns
+        None if the packet type doesn't exist.
+        """
+        try:
+            typ = self.types[packet['type']]
+        except KeyError:
+            return None
+
+        return typ(packet)
