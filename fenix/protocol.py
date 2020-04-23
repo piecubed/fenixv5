@@ -19,45 +19,50 @@ class BaseProtocol(_protocolCore.BaseMessage):
 incomingMessages = _protocolCore.ProtocolHelper()
 
 @incomingMessages.add('captcha')
-class _Captcha(BaseProtocol):
+class Captcha(BaseProtocol):
     link: str # Original link to captcha
     text: str # Completed text
 
-@incomingMessages.add('channelCreate')
-class _ChannelCreate(BaseProtocol):
+@incomingMessages.add('createChannel')
+class CreateChannel(BaseProtocol):
     channel: int
     server: int
 
-@incomingMessages.add('login')
-class _Login(BaseProtocol):
+@incomingMessages.add('fetchUserByID')
+class FetchUserByID(BaseProtocol):
+    id: int
+
+@incomingMessages.add('signIn')
+class SignIn(BaseProtocol):
     email: str
     password: str
 
-@incomingMessages.add('loginBot')
-class _LoginBot(BaseProtocol):
+@incomingMessages.add('getServers')
+@incomingMessages.add('loginAsBot')
+class LoginAsBot(BaseProtocol):
     token: str
 
 @incomingMessages.add('message')
-class _Message(BaseProtocol):
+class Message(BaseProtocol):
     channelID: int
     message: str
 
-@incomingMessages.add('register')
-class _Register(BaseProtocol):
+@incomingMessages.add('signUp')
+class SignUp(BaseProtocol):
     email: str
     username: str
     password: str
 
 @incomingMessages.add('registerBot')
-class _RegisterBot(BaseProtocol):
+class RegisterBot(BaseProtocol):
     name: str
     parent_email: str
     parent_password: str
 
 @incomingMessages.add('verify')
-class _Verify(BaseProtocol):
+class Verify(BaseProtocol):
     code: str
 
 @incomingMessages.add('version')
-class _Version(BaseProtocol):
+class Version(BaseProtocol):
     pass

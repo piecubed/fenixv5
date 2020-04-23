@@ -12,7 +12,7 @@ class UserDatabaseTests(unittest.TestCase):
     @asyncTest #type: ignore
     async def test1(self) -> None:
         await self.createDatabase()
-        await self.database.signUp('test', 'testpassword', 'piesquared@gmail.com')
+        print(await self.database.signUp('test', 'testpassword', 'piesquared@gmail.com'))
     
     @asyncTest #type: ignore
     async def test2(self) -> None:
@@ -29,7 +29,10 @@ class UserDatabaseTests(unittest.TestCase):
     @asyncTest #type: ignore
     async def test5(self) -> None:
         await self.database.joinServer(1, 1)
-        await self.createDatabase()
-        
+
+    
+    #@asyncTest #type: ignore
+    #async def test5(self) -> None:
+    #    await self.database.create
 if __name__ == '__main__':
     unittest.main()

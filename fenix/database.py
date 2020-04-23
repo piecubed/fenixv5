@@ -9,7 +9,7 @@ import base64
 import datetime
 import hashlib
 import secrets
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Iterator
 
 try:
     import fenix.conf as conf
@@ -20,8 +20,20 @@ except ImportError:
 import asyncpg
 from email_validator import EmailNotValidError, validate_email
 
+class Dataclass:
 
-class User:
+    def __iter__(self) -> Iterator[Any]:
+        for attr in self.__annotations__:
+            yield getattr(self, attr)
+
+    @classmethod
+    def fromDict(cls, source: Dict[str, Any]): #type: ignore
+        self = cls()
+        for method in self:
+            setattr(self, method, source[method])
+        return self
+    
+class User(Dataclass):
 
     id: int
     username: str
@@ -35,44 +47,9 @@ class User:
     verified: bool
     servers: Dict[str, 'Server']
 
-    @property
-    def hasServers(self) -> bool:
-        return self.servers is not None
-
-    @property
-    def isVerified(self) -> bool:
-        return self.verified
-
-    def checkPassword(self, password: bytes) -> bool:
-        return secrets.compare_digest(AuthUtils.checkPassword(self.salt, password), self.password)
-
-    def checkToken(self, token: str) -> bool:
-        return self.token == token
-
-    def isUser(self, id: int) -> bool:
-        return self.id == id
-
-    def __str__(self) -> str:
-        return self.username
-
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'User':
-        self = cls()
-        self.id = int(source['uid'])
-        self.username = str(source['username'])
-        self.password = bytes(source['password'])
-        self.email = str(source['email'])
-        self.salt = bytes(source['salt'])
-        self.settings = source['settings']
-        self.token = str(source['token'])
-        self.usernameHash = str(source['usernamehash'])
-        self.createdAt = source['createdat']
-        self.verified = bool(source['verified'])
-        try:
-            self.servers = source['servers']
-        except KeyError:
-            pass
-        return self
+        return super().fromDict(source) #type: ignore
 
 class AuthUtils:
     @classmethod
@@ -80,7 +57,7 @@ class AuthUtils:
         return hashlib.pbkdf2_hmac('sha512', password, salt, 100000)
 
 
-class Server:
+class Server(Dataclass):
 
     ID: int
     name: str
@@ -89,13 +66,7 @@ class Server:
 
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Server':
-        self = cls()
-        self.ID = int(source['id'])
-        self.name = str(source['name'])
-        self.createdAt = source['createdat']
-        if 'settings' in source.keys():
-            self.settings = source['settings']
-        return self
+        return super().fromDict(source) #type: ignore
 
     @classmethod
     def fromListToList(cls, source: List[Dict[str, Any]]) -> List['Server']:
@@ -114,19 +85,14 @@ class Server:
 
         return servers
         
-class Role:
+class Role(Dataclass):
     name: str
     color: str
     id: int
 
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Role':
-        self = cls()
-        self.name = str(source['name'])
-        self.color = str(source['color'])
-        self.id = int(source['id'])
-
-        return self
+        return super().fromDict(source) #type: ignore
 
     @classmethod
     def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[int, 'Role']:
@@ -145,8 +111,9 @@ class Role:
 
         return roles
 
+serverRegistrationWhiteList: Tuple[str, ...] = ('admin', 'addChannels', 'assignRoles', 'kick', 'ban', 'changeNick', 'changeOthersNick')
 
-class ServerRegistration:
+class ServerRegistration(Dataclass):
     userID: int
     serverID: int
     roles: List[int]
@@ -158,21 +125,9 @@ class ServerRegistration:
     changeNick: bool
     changeOthersNick: bool
     
-    whitelist: Tuple[str, ...] = ('admin', 'addChannels', 'assignRoles', 'kick', 'ban', 'changeNick', 'changeOthersNick')
-    
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'ServerRegistration':
-        self = cls()
-        self.userID = int(source['userID'])
-        self.serverID = int(source['serverID'])
-        self.roles = source['roles']
-        self.addChannels = source['addChannels']
-        self.assignRoles = source['assignRoles']
-        self.kick = source['kick']
-        self.ban = source['ban']
-        self.changeNick = source['changeNick']
-        self.changeOthersNick = source['changeOthersNick']
-        return self
+        return super().fromDict(source) #type: ignore
 
     @classmethod
     def fromListToList(cls, source: List[Dict[str, Any]]) -> List['ServerRegistration']:
@@ -181,8 +136,9 @@ class ServerRegistration:
             serverRegistration.append(cls.fromDict(raw))
 
         return serverRegistration
-    
-class ChannelPermissions:
+channelPermissionsWhiteList: Tuple[str, ...] = ('canRead', 'canTalk', 'canReadHistory', 'canDeleteMessages', 'canManageChannel', 'canPinMessages', 'canMentionEveryone')
+
+class ChannelPermissions(Dataclass):
     userID: int
     channelID: int
     canRead: bool
@@ -195,24 +151,12 @@ class ChannelPermissions:
     canMentionEveryone: bool
     canAddReactions: bool
     
-    whitelist: Tuple[str, ...] = ('canRead', 'canTalk', 'canReadHistory', 'canDeleteMessages', 'canManageChannel', 'canPinMessages', 'canMentionEveryone')
+    
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'ChannelPermissions':
-        self = cls()
-        self.userID = source['userID']
-        self.channelID = source['channelID']
-        self.canRead = source['canRead']
-        self.canTalk = source['canTalk']
-        self.canReadHistory = source['canReadHistory']
-        self.canDeleteMessages = source['canDeleteMessages']
-        self.canManageChannel = source['canManageChannel']
-        self.canManagePermissions = source['canManagePermissions']
-        self.canPinMessages = source['canPinMessages']
-        self.canMentionEveryone = source['canMentionEveryone']
-        self.canAddReactions = source['canAddReactions']
-        return self
+        return super().fromDict(source) #type: ignore
 
-class Message:
+class Message(Dataclass):
     userID: int
     channelID: int
     content: str
@@ -222,27 +166,27 @@ class Message:
     
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Message':
-        self = cls()
-        self.userID = source['userID']
-        self.channelID = source['channelID']
-        self.content = source['content']
-        self.timestamp = source['timestamp']
-        self.pinned = source['timestamp']
-        self.reactions = source['reactions']
-        return self
+        return super().fromDict(source) #type: ignore
 
-class Reaction:
+class Reaction(Dataclass):
     id: int
     unicode: str
     users: List[int]
 
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Reaction':
-        self = cls()
-        self.id = source['id']
-        self.unicode = source['unicode']
-        self.users = source['users']
-        return self
+        return super().fromDict(source) #type: ignore
+        
+class Channel(Dataclass):
+    id: int
+    name: str
+    serverID: int
+    createdAt: datetime.datetime
+    
+    @classmethod
+    def fromDict(cls, source: Dict[str, Any]) -> 'Channel':
+        return super().fromDict(source) #type: ignore
+
 
 class _Database:
 
@@ -297,7 +241,7 @@ class _SQL:
     pinMessage = 'CASE WHEN (SELECT canTalk from ChannelPermissions WHERE channelID = $1 AND userID = $2) THEN UPDATE Messages SET pinned = $1 WHERE id = $2 AND userID = $3 RETURN *'
     removeReaction1 = '''UPDATE Messages SET ARRAY_REMOVE(reactions, $1) WHERE id = (SELECT messageID FROM Reactions WHERE id = $1)'''
     removeReaction2 = '''DELETE Reactions WHERE id = $1'''
-    
+    createChannel = 'INSERT INTO Channels(name, serverID, createdAt) VALUES ($1, $2, CURRENT_TIMESTAMP) RETURN *'
 class Database(_Database):
 
     async def fetchUserByEmail(self, email: str) -> User:
@@ -418,7 +362,7 @@ class Database(_Database):
         return server
     
     async def hasChannelPermission(self, permission: str, userID: int, channelID: int) -> bool:
-        if permission not in ChannelPermissions.whitelist:
+        if permission not in channelPermissionsWhiteList:
             raise InvalidPermissionName
         
         permissions = await self._fetch(_SQL.hasChannelPermission, permission, userID, channelID)
@@ -426,7 +370,7 @@ class Database(_Database):
         return bool(permissions[0])
 
     async def hasServerPermission(self, permission: str, userID: int, serverID: int) -> bool:
-        if permission not in ServerRegistration.whitelist:
+        if permission not in serverRegistrationWhiteList:
             raise InvalidPermissionName
         
         permissions = await self._fetch(_SQL.hasServerPermission, permission, userID, serverID)
@@ -434,7 +378,7 @@ class Database(_Database):
         return bool(permissions[0])
     
     async def changechannelPermission(self, permission: str, value: bool, userID: int, channelID: int, actor: int) -> ChannelPermissions:
-        if permission not in ChannelPermissions.whitelist:
+        if permission not in channelPermissionsWhiteList:
             raise InvalidPermissionName
         
         permissions = await self._fetch(_SQL.changeChannelPermission, permission, value, userID, channelID, actor)
@@ -445,7 +389,7 @@ class Database(_Database):
         return ChannelPermissions.fromDict(permissions[0])
     
     async def changeServerPermission(self, permission: str, value: bool, userID: int, serverID: int, actor: int) -> ServerRegistration:
-        if permission not in ServerRegistration.whitelist:
+        if permission not in serverRegistrationWhiteList:
             raise InvalidPermissionName
         
         permissions = await self._fetch(_SQL.changeServerPermission, permission, value, userID, serverID, actor)
@@ -479,6 +423,10 @@ class Database(_Database):
     async def removeReaction(self, reactionID: int) -> None:
         await self._execute(_SQL.removeReaction1, reactionID)
         await self._execute(_SQL.removeReaction2, reactionID)
+    
+    async def createChannel(self, serverID: int, name: str) -> Channel:
+        channel = await self._fetch(_SQL.createChannel, name, serverID)
+        return Channel.fromDict(channel)
         
 class CannotTalk(Exception):
     pass

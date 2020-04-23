@@ -18,7 +18,7 @@ DROP TABLE IF EXISTS Channels;
 CREATE TABLE Channels(
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
-    serverID TEXT NOT NULL,
+    serverID INT NOT NULL,
     createdAt TIMESTAMP NOT NULL
 );
 
