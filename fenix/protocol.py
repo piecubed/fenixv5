@@ -12,57 +12,58 @@ from typing import Dict, Type, Union
 from fenix import _protocolCore
 
 
-class BaseProtocol(_protocolCore.BaseMessage):
+class _BaseProtocol(_protocolCore.BaseMessage):
     async def process(self) -> None:
         pass
 
 incomingMessages = _protocolCore.ProtocolHelper()
 
+
 @incomingMessages.add('captcha')
-class Captcha(BaseProtocol):
+class Captcha(_BaseProtocol):
     link: str # Original link to captcha
     text: str # Completed text
 
 @incomingMessages.add('createChannel')
-class CreateChannel(BaseProtocol):
+class CreateChannel(_BaseProtocol):
     channel: int
     server: int
 
 @incomingMessages.add('fetchUserByID')
-class FetchUserByID(BaseProtocol):
+class FetchUserByID(_BaseProtocol):
     id: int
 
 @incomingMessages.add('signIn')
-class SignIn(BaseProtocol):
+class SignIn(_BaseProtocol):
     email: str
     password: str
 
 @incomingMessages.add('getServers')
 @incomingMessages.add('loginAsBot')
-class LoginAsBot(BaseProtocol):
+class LoginAsBot(_BaseProtocol):
     token: str
 
 @incomingMessages.add('message')
-class Message(BaseProtocol):
+class Message(_BaseProtocol):
     channelID: int
     message: str
 
 @incomingMessages.add('signUp')
-class SignUp(BaseProtocol):
+class SignUp(_BaseProtocol):
     email: str
     username: str
     password: str
 
 @incomingMessages.add('registerBot')
-class RegisterBot(BaseProtocol):
+class RegisterBot(_BaseProtocol):
     name: str
     parent_email: str
     parent_password: str
 
 @incomingMessages.add('verify')
-class Verify(BaseProtocol):
+class Verify(_BaseProtocol):
     code: str
 
 @incomingMessages.add('version')
-class Version(BaseProtocol):
+class Version(_BaseProtocol):
     pass

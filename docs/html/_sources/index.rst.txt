@@ -1,0 +1,58 @@
+Welcome to fenix!
+=======================================================
+
+Fenixv5 API
+===========
+
+Fenix uses websockets, and the current endpoint is
+``wss://bloblet.com:3300``.
+
+All methods will accept an ``id`` parameter, which will be returned
+without changes. This is optional, but it's nicely useful to make sure
+you are handling the same request you made.
+
+General Template
+----------------
+
+::
+
+    {
+        'id': optional,
+        'type': str,
+        ...
+    }
+
+
+--------------
+
+Channel related
+---------------
+
+channelHistory
+~~~~~~~~~~~~~~
+
+::
+
+    {
+        'type': 'channelHistory',
+        'channelID': int,
+        'lastMessage': int
+    }
+
+-  ``lastMessage`` is the last message you recieved in ``channelID``
+-  You will recive the most recent 50 (or less) new messages in
+   ``channelID`` in array format.
+-  If you can't read ``channelID`` or can't read its history, a `*``PermissionsError``* <#permissionserror>`__ is raised.
+   ----------------------------------------------------------------------------------------------------------------------
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Contents:
+.. note:: yay
+
+Indices and tables
+==================
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
