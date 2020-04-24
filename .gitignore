@@ -131,3 +131,6 @@ dmypy.json
 # vscode
 .vscode
 fenix/conf.py
+_build
+_static
+_templates
