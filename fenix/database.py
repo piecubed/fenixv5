@@ -23,8 +23,7 @@ from email_validator import EmailNotValidError, validate_email
 class Dataclass:
 
     def __iter__(self) -> Iterator[Any]:
-        for attr in self.__annotations__:
-            yield getattr(self, attr)
+        yield from self.__annotations__
 
     @classmethod
     def fromDict(cls, source: Dict[str, Any]): #type: ignore
