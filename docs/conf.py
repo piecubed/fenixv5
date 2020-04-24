@@ -54,16 +54,16 @@ html_theme = 'alabaster'
 html_static_path = ['_static']
 
 
-try:
-    import sphinx_glpi_theme
-except ImportError:
-    import pip
-    if hasattr(pip, 'main'):
-        pip.main(['install', 'sphinx_glpi_theme'])
-    else:
-        pip._internal.main(['install', 'sphinx_glpi_theme'])
-    import sphinx_glpi_theme
+# try:
+#     import sphinx_glpi_theme
+# except ImportError:
+#     import pip
+#     if hasattr(pip, 'main'):
+#         pip.main(['install', 'sphinx_glpi_theme'])
+#     else:
+#         pip._internal.main(['install', 'sphinx_glpi_theme'])
+#     import sphinx_glpi_theme
         
-html_theme = "glpi"
+# html_theme = "glpi"
 
-html_theme_path = sphinx_glpi_theme.get_html_themes_path()
+# html_theme_path = sphinx_glpi_theme.get_html_themes_path()
