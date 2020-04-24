@@ -2,7 +2,7 @@ import inspect
 import database
 print(dir(database.Database))
       
-def getStuff(method):
+def getMarkDown(method: str) -> str:
     db = database.Database
 
     args = inspect.getfullargspec(getattr(db, method))
@@ -21,7 +21,7 @@ file = ''
 
 for member in inspect.getmembers(database.Database):
     if inspect.isfunction(member[1]) and not member[0].startswith('_'):
-        file += getStuff(member[0])
+        file += getMarkDown(member[0])
 
 with open('yay.md', 'w+') as f:
     f.write(file)
