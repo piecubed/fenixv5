@@ -38,6 +38,5 @@ General Template
    
 Indices and tables
 ^^^^^^^^^^^^^^^^
-* :ref:`genindex`
-* :ref:`modindex`
+* :ref:`contents`
 * :ref:`search`
