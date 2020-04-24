@@ -29,7 +29,7 @@ class Dataclass:
     def fromDict(cls, source: Dict[str, Any]): #type: ignore
         self = cls()
         for method in self:
-            setattr(self, method, source[method])
+            setattr(self, method.lower(), source[method])
         return self
     
 class User(Dataclass):
