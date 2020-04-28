@@ -7,130 +7,138 @@
 # Optional __future__ import for testing
 from __future__ import annotations
 
-from typing import Dict, Type, Union
+from typing import Dict, Union, Any
 
 from fenix import _protocolCore
 
+import datetime
 
-class _BaseProtocol(_protocolCore.BaseMessage):
-    async def process(self) -> None:
-        pass
+class BaseProtocol(_protocolCore.BaseMessage):
+	pass
+
+outgoingMessages: _protocolCore.ProtocolHelper = _protocolCore.ProtocolHelper()
+@outgoingMessages.add('authUser')
+class AuthUser(BaseProtocol):
+	id: int
+	username: str
+	email: str
+	settings: Dict[str, Any]
+	token: str
+	usernameHash: int
+	createdAt: datetime.datetime
+	verified: bool
+	servers: Dict[str, Dict[str, str]]
 
 incomingMessages: _protocolCore.ProtocolHelper = _protocolCore.ProtocolHelper()
 
 @incomingMessages.add('signIn')
-class SignIn(_BaseProtocol):
-    email: str
-    password: str
+class SignIn(BaseProtocol):
+	email: str
+	password: str
 
 @incomingMessages.add('signUp')
-class SignUp(_BaseProtocol):
-    email: str
-    username: str
-    password: str
+class SignUp(BaseProtocol):
+	email: str
+	username: str
+	password: str
 
 @incomingMessages.add('createChannel')
-class CreateChannel(_BaseProtocol):
-    serverID: int
-    name: str
-    
+class CreateChannel(BaseProtocol):
+	serverID: int
+	name: str
+
 @incomingMessages.add('sendMessage')
-class SendMessage(_BaseProtocol):
-    channelID: int
-    contents: str
-    
+class SendMessage(BaseProtocol):
+	channelID: int
+	contents: str
+
 @incomingMessages.add('editMessage')
-class EditMessage(_BaseProtocol):
-    messageID: int
-    contents: str
+class EditMessage(BaseProtocol):
+	messageID: int
+	contents: str
 
 @incomingMessages.add('deleteMessage')
-class DeleteMessage(_BaseProtocol):
-    messageID: int
-    
+class DeleteMessage(BaseProtocol):
+	messageID: int
+
 @incomingMessages.add('addReaction')
-class AddReaction(_BaseProtocol):
-    messageID: int
-    reaction: str
+class AddReaction(BaseProtocol):
+	messageID: int
+	reaction: str
 
 @incomingMessages.add('removeReaction')
-class RemoveReaction(_BaseProtocol):
-    messageID: int
-    reaction: int
-    
+class RemoveReaction(BaseProtocol):
+	messageID: int
+	reaction: int
+
 @incomingMessages.add('changeServerPermission')
-class ChangeServerPermission(_BaseProtocol):
-    permission: str
-    value: bool
-    userID: int
-    serverID: int
-    actor: int
-    
-@incomingMessages.add('changechannelPermission')
-class ChangechannelPermission(_BaseProtocol):
-    permission: str
-    value: bool
-    userID: int
-    channelID: int
-    actor: int
+class ChangeServerPermission(BaseProtocol):
+	permission: str
+	value: bool
+	userID: int
+	serverID: int
+	actor: int
+
+@incomingMessages.add('changeChannelPermission')
+class ChangeChannelPermission(BaseProtocol):
+	permission: str
+	value: bool
+	userID: int
+	channelID: int
+	actor: int
 
 @incomingMessages.add('getPerms')
-class GetPerms(_BaseProtocol):
-    userID: int
-    serverID: int
+class GetPerms(BaseProtocol):
+	userID: int
+	serverID: int
 
 @incomingMessages.add('getPermsList')
-class GetPermsList(_BaseProtocol):
-    userID: int
-    serverID: int
-    
+class GetPermsList(BaseProtocol):
+	userID: int
+	serverID: int
+
 @incomingMessages.add('hasChannelPermission')
-class HasChannelPermission(_BaseProtocol):
-    permission: str
-    userID: int
-    channelID: int
+class HasChannelPermission(BaseProtocol):
+	permission: str
+	userID: int
+	channelID: int
 
 @incomingMessages.add('hasServerPermission')
-class HasServerPermission(_BaseProtocol):
-    permission: str
-    userID: int
-    channelID: int
+class HasServerPermission(BaseProtocol):
+	permission: str
+	userID: int
+	channelID: int
 
 @incomingMessages.add('getRoles')
-class GetRoles(_BaseProtocol):
-    userID: int
-    serverID: int
+class GetRoles(BaseProtocol):
+	userID: int
+	serverID: int
 
 @incomingMessages.add('getRolesList')
-class GetRolesList(_BaseProtocol):
-    userID: int
-    serverID: int
+class GetRolesList(BaseProtocol):
+	userID: int
+	serverID: int
 
 @incomingMessages.add('joinRoles')
-class JoinRoles(_BaseProtocol):
-    userID: int
-    serverID: int
-    roleID: int
-    actor: int
-    
+class JoinRoles(BaseProtocol):
+	userID: int
+	serverID: int
+	roleID: int
+	actor: int
+
 @incomingMessages.add('createServer')
-class CreateServer(_BaseProtocol):
-    userID: int
-    name: str
+class CreateServer(BaseProtocol):
+	userID: int
+	name: str
 
 @incomingMessages.add('getServer')
-class GetServer(_BaseProtocol):
-    serverID: int
+class GetServer(BaseProtocol):
+	serverID: int
 
 @incomingMessages.add('getServers')
-class GetServers(_BaseProtocol):
-    serverID: int
+class GetServers(BaseProtocol):
+	serverID: int
 
 @incomingMessages.add('getServersList')
-class GetServersList(_BaseProtocol):
-    serverID: int
-
-@incomingMessages.add('joinServer')
-class GetServer(_BaseProtocol):
-    serverID: int
-    userID: int
+class GetServersList(BaseProtocol):
+	serverID: int

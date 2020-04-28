@@ -14,6 +14,8 @@ signIn
         'password': str,
     }
 
+Returns a `AuthUser <#AuthUser>`__
+
 --------------
 
 signUp
@@ -28,8 +30,11 @@ signUp
         'email': str,
     }
 
+Returns a `AuthUser <#AuthUser>`__
+
 Indices and tables
-""""""""""""
+""""""""""""""""""
+
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`

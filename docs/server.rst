@@ -1,4 +1,4 @@
-Servers 
+Servers
 =======
 --------------
 
@@ -9,9 +9,10 @@ createServer
 
     {
         'type': 'createServer',
-        'userID': int,
         'name': str,
     }
+
+Creates a server, `name`, and sends back a `server <#server>`__
 
 --------------
 
@@ -46,7 +47,7 @@ getServersList
 
     {
         'type': 'getServersList',
-        'id': int,
+        'serverID': int,
     }
 
 --------------
@@ -58,7 +59,6 @@ joinServer
 
     {
         'type': 'joinServer',
-        'userID': int,
         'serverID': int,
     }
 

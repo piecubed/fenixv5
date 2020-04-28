@@ -11,8 +11,10 @@ All methods will accept an ``id`` parameter, which will be returned
 without changes. This is optional, but it's nicely useful to make sure
 you are handling the same request you made.
 
-General Template
-~~~~~~~~~~~
+
+
+General Template for messages
+~~~~~~~~~~~~~~~~
 
 ::
 
@@ -37,6 +39,6 @@ General Template
    
    
 Indices and tables
-^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
 * :ref:`contents`
 * :ref:`search`

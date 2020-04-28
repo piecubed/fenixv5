@@ -15,7 +15,6 @@ changeServerPermission
         'value': bool,
         'userID': int,
         'serverID': int,
-        'actor': int,
     }
 
 --------------
@@ -31,7 +30,6 @@ changechannelPermission
         'value': bool,
         'userID': int,
         'channelID': int,
-        'actor': int,
     }
 
 -------------

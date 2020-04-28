@@ -39,7 +39,6 @@ joinRole
         'userID': int,
         'serverID': int,
         'roleID': int,
-        'actor': int,
     }
 
 Indices and tables

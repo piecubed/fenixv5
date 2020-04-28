@@ -8,7 +8,7 @@ sendMessage
 
     {
         'type': 'sendMessage',
-        'channelID': int, 
+        'channelID': int,
         'contents': str
     }
 
@@ -33,7 +33,7 @@ editMessage
 -  If you aren't the owner of ``messageID``, then a
    `PermissionsError <#permissionserror>`__ is raised.
 -  If contents is over 1000 characters, then a `ContentTooLong <#contenttoolong>`__ error is raised.
---------------
+-----------------------------------------------------------------------------------------------------
 
 deleteMessage
 ~~~~~~~~~~~~~
