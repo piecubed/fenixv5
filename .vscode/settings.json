@@ -6,7 +6,9 @@
     "--ignore-missing-imports",
     "--follow-imports=silent",
     "--show-column-numbers",
-    "--strict"
+    "--strict",
+    "--allow-subclassing-any",
+    "--allow-untyped-decorators"
   ],
   "python.testing.unittestArgs": [
     "-v",

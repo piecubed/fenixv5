@@ -7,7 +7,7 @@
 # Optional __future__ import for testing
 from __future__ import annotations
 
-from typing import Dict, Union, Any
+from typing import Any, Dict, List, Optional, Union
 
 from fenix import _protocolCore
 
@@ -16,10 +16,10 @@ import datetime
 class BaseProtocol(_protocolCore.BaseMessage):
 	pass
 
-outgoingMessages: _protocolCore.ProtocolHelper = _protocolCore.ProtocolHelper()
-@outgoingMessages.add('authUser')
+serverMessages: _protocolCore.ProtocolHelper = _protocolCore.ProtocolHelper()
+
+@serverMessages.add('authUser')
 class AuthUser(BaseProtocol):
-	id: int
 	username: str
 	email: str
 	settings: Dict[str, Any]
@@ -29,116 +29,195 @@ class AuthUser(BaseProtocol):
 	verified: bool
 	servers: Dict[str, Dict[str, str]]
 
-incomingMessages: _protocolCore.ProtocolHelper = _protocolCore.ProtocolHelper()
+@serverMessages.add('reactionAdded')
+class ReactionAdded(BaseProtocol):
+	messageID: int
+	numberOfReactions: int
+	emoji: str
 
-@incomingMessages.add('signIn')
+@serverMessages.add('messageSent')
+class MessageSent(BaseProtocol):
+	avatar: str
+	nick: str
+	messageID: int
+	content: str
+	timestamp: int
+	channelID: int
+
+@serverMessages.add('messageEdited')
+class MessageEdited(BaseProtocol):
+	messageID: int
+	content: str
+
+@serverMessages.add('messageDeleted')
+class MessageDeleted(BaseProtocol):
+	messageID: int
+
+@serverMessages.add('channelInfo')
+class ChannelInfo(BaseProtocol):
+	"""
+	History is a List of a messages.  Keys would be
+	```
+	{
+	  'messageID': int,
+	  'userID': int,
+	  'content': str,
+	  'timestamp': int
+	  'avatar': str
+	  'nick': str
+	}
+	```
+	"""
+
+	channelID: int
+	history: List[Dict[str, Any]]
+	channelName: str
+
+@serverMessages.add('serverInfo')
+class ServerInfo(BaseProtocol):
+	"""
+	channels is a list of channels. Keys would be
+	```
+	{
+		'channelID': int
+		'channelName': str
+		'categoryName': str
+	}
+	```
+
+	users is a list of 20 users
+	```
+	{
+		'userID': int
+		'roleID': int
+		'avatar': str
+		'nick': str
+	}
+	"""
+	serverID: int
+	channels: List[Dict[str, Any]]
+	users: List[Dict[str, Any]]
+	serverAvatar: str
+	serverName: str
+
+@serverMessages.add('serverInfo')
+class ChannelError(BaseProtocol):
+	"""
+	Raised when a user doesn't have permission to view a channel,
+	or a channel that doesnt exist is queried.
+	"""
+
+@serverMessages.add('messageError')
+class MessageError(BaseProtocol):
+	"""
+	Raised when a user tries to delete or edit a nonexistant message.
+	"""
+
+clientMessages: _protocolCore.ProtocolHelper = _protocolCore.ProtocolHelper()
+
+@clientMessages.add('changeSubscribedChannel')
+class ChangeSubscribedChannel(BaseProtocol):
+	channelID: int
+
+@clientMessages.add('signIn')
 class SignIn(BaseProtocol):
 	email: str
 	password: str
+	subscribedChannel: Optional[int] = None
 
-@incomingMessages.add('signUp')
+@clientMessages.add('signUp')
 class SignUp(BaseProtocol):
 	email: str
 	username: str
 	password: str
 
-@incomingMessages.add('createChannel')
+@clientMessages.add('createChannel')
 class CreateChannel(BaseProtocol):
 	serverID: int
 	name: str
 
-@incomingMessages.add('sendMessage')
+@clientMessages.add('sendMessage')
 class SendMessage(BaseProtocol):
 	channelID: int
 	contents: str
 
-@incomingMessages.add('editMessage')
+@clientMessages.add('editMessage')
 class EditMessage(BaseProtocol):
 	messageID: int
 	contents: str
 
-@incomingMessages.add('deleteMessage')
+@clientMessages.add('deleteMessage')
 class DeleteMessage(BaseProtocol):
 	messageID: int
 
-@incomingMessages.add('addReaction')
+@clientMessages.add('addReaction')
 class AddReaction(BaseProtocol):
 	messageID: int
 	reaction: str
 
-@incomingMessages.add('removeReaction')
+@clientMessages.add('removeReaction')
 class RemoveReaction(BaseProtocol):
 	messageID: int
 	reaction: int
 
-@incomingMessages.add('changeServerPermission')
+@clientMessages.add('changeServerPermission')
 class ChangeServerPermission(BaseProtocol):
 	permission: str
 	value: bool
-	userID: int
 	serverID: int
 	actor: int
 
-@incomingMessages.add('changeChannelPermission')
+@clientMessages.add('changeChannelPermission')
 class ChangeChannelPermission(BaseProtocol):
 	permission: str
 	value: bool
-	userID: int
 	channelID: int
 	actor: int
 
-@incomingMessages.add('getPerms')
+@clientMessages.add('getPerms')
 class GetPerms(BaseProtocol):
-	userID: int
 	serverID: int
 
-@incomingMessages.add('getPermsList')
+@clientMessages.add('getPermsList')
 class GetPermsList(BaseProtocol):
-	userID: int
 	serverID: int
 
-@incomingMessages.add('hasChannelPermission')
+@clientMessages.add('hasChannelPermission')
 class HasChannelPermission(BaseProtocol):
 	permission: str
-	userID: int
 	channelID: int
 
-@incomingMessages.add('hasServerPermission')
+@clientMessages.add('hasServerPermission')
 class HasServerPermission(BaseProtocol):
 	permission: str
-	userID: int
 	channelID: int
 
-@incomingMessages.add('getRoles')
+@clientMessages.add('getRoles')
 class GetRoles(BaseProtocol):
-	userID: int
 	serverID: int
 
-@incomingMessages.add('getRolesList')
+@clientMessages.add('getRolesList')
 class GetRolesList(BaseProtocol):
-	userID: int
 	serverID: int
 
-@incomingMessages.add('joinRoles')
+@clientMessages.add('joinRoles')
 class JoinRoles(BaseProtocol):
-	userID: int
 	serverID: int
 	roleID: int
 	actor: int
 
-@incomingMessages.add('createServer')
+@clientMessages.add('createServer')
 class CreateServer(BaseProtocol):
-	userID: int
 	name: str
 
-@incomingMessages.add('getServer')
+@clientMessages.add('getServer')
 class GetServer(BaseProtocol):
 	serverID: int
 
-@incomingMessages.add('getServers')
-class GetServers(BaseProtocol):
+@clientMessages.add('getServers')
+class GetUsersServers(BaseProtocol):
 	serverID: int
 
-@incomingMessages.add('getServersList')
+@clientMessages.add('getServersList')
 class GetServersList(BaseProtocol):
 	serverID: int

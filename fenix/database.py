@@ -230,27 +230,7 @@ class _SQL:
 	editMessage = 'CASE WHEN (SELECT canTalk from ChannelPermissions WHERE channelID = $4 AND userID = $3) THEN UPDATE Messages SET contents = $1 WHERE id = $2 and userID = $3 RETURNING *'
 	deleteMessage = 'DELETE Messages WHERE id = $1 AND userID = $2'
 	# 1: messageID, 2 userID 3 channelID 4 unicode
-	addReaction = '''
-					CREATE FUNCTION addReaction(messageID integer, userID integer, channelID integer, unicode text) RETURNS integer $$
-
-					BEGIN
-						SELECT canTalk, canAddReactions INTO canTalk, canAddReactions FROM ChannelPermissions WHERE channelID = $3 AND userID = $2;
-						IF (canAddReactions AND canTalk) THEN
-							IF ARRAY_LENGTH(
-									(SELECT reactions FROM Messages WHERE messageID = $1)) = 0 THEN
-								RETURN UPDATE Messages SET
-										ARRAY_APPEND(reactions, (INSERT INTO Reactions(unicode, messageID, users) VALUES ($4, $1, {$2}) RETURNING id))
-									WHERE id = $1 AND userID = $2
-									RETURNING id;
-							ELSE
-								RETURN UPDATE Messages SET
-									reactions = ARRAY_APPEND(reactions, (SELECT id FROM Reactions WHERE messageID = $1))
-									WHERE id = $1 AND userID = $2 RETURN id;
-							END IF;
-						END IF;
-					END
-					$$;
-				'''
+	addReaction = 'addReaction($1, $2, $3, $4)'
 
 	pinMessage = 'CASE WHEN (SELECT canTalk from ChannelPermissions WHERE channelID = $1 AND userID = $2) THEN UPDATE Messages SET pinned = $1 WHERE id = $2 AND userID = $3 RETURN *'
 	removeReaction1 = '''UPDATE Messages SET ARRAY_REMOVE(reactions, $1) WHERE id = (SELECT messageID FROM Reactions WHERE id = $1)'''

@@ -1,0 +1,27 @@
+CREATE FUNCTION addReaction(messageID integer, userID integer, channelID integer, unicode text) RETURNS integer AS $$
+DECLARE
+    reactionID integer;
+BEGIN
+    SELECT canTalk, canAddReactions FROM ChannelPermissions WHERE channelID = channelID AND userID = userID;
+    IF (canAddReactions AND canTalk) THEN
+        IF ARRAY_LENGTH(
+                (SELECT reactions FROM Messages WHERE messageID = messageID)) = 0 THEN -- If there are no reactions, add a reaction row for this message.
+
+
+            INSERT INTO Reactions(unicode, messageID, users) VALUES (unicode, messageID, (userID)) RETURNING reactionID INTO reactionID;
+
+            UPDATE Messages SET
+                    reactions = (reactionID)
+                WHERE messageID = messageID AND userID = userID;
+
+            RETURN reactionID;
+
+        ELSE
+            UPDATE Messages SET
+                reactions = ARRAY_APPEND(reactions, (SELECT messageID FROM Reactions WHERE messageID = messageID))
+                WHERE id = messageID AND userID = userID;
+        END IF;
+    END IF;
+END; $$
+LANGUAGE PLPGSQL;
+
