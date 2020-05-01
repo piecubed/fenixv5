@@ -34,7 +34,7 @@ class Dataclass:
 
 class User(Dataclass):
 
-	id: int
+	userID: int
 	username: str
 	password: bytes
 	email: str
@@ -58,7 +58,7 @@ class AuthUtils:
 
 class Server(Dataclass):
 
-	ID: int
+	serverID: int
 	name: str
 	createdAt: datetime.datetime
 	settings: Dict[str, Any]
@@ -80,14 +80,14 @@ class Server(Dataclass):
 		servers: Dict[int, 'Server'] = {}
 		for raw in source:
 			server = cls.fromDict(raw)
-			servers[server.ID] = server
+			servers[server.serverID] = server
 
 		return servers
 
 class Role(Dataclass):
 	name: str
 	color: str
-	id: int
+	roleID: int
 
 	@classmethod
 	def fromDict(cls, source: Dict[str, Any]) -> 'Role':
@@ -98,7 +98,7 @@ class Role(Dataclass):
 		roles: Dict[int, 'Role'] = {}
 		for raw in source:
 			role = cls.fromDict(raw)
-			roles[role.id] = role
+			roles[role.roleID] = role
 
 		return roles
 
@@ -168,7 +168,7 @@ class Message(Dataclass):
 		return super().fromDict(source) #type: ignore
 
 class Reaction(Dataclass):
-	id: int
+	reactionID: int
 	unicode: str
 	users: List[int]
 
@@ -177,7 +177,7 @@ class Reaction(Dataclass):
 		return super().fromDict(source) #type: ignore
 
 class Channel(Dataclass):
-	id: int
+	channelID: int
 	name: str
 	serverID: int
 	createdAt: datetime.datetime
@@ -212,29 +212,29 @@ class _Database:
 class _SQL:
 	fetchUserByEmail = 'SELECT * FROM Users WHERE email = $1'
 	signUp = 'INSERT INTO Users(username, password, email, salt, token, createdAt, verified) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, TRUE) RETURNING *'
-	getServers = 'SELECT * FROM ServerRegistration INNER JOIN Servers ON ServerRegistration.userID = CAST($1 AS INT) and Servers.id = ServerRegistration.serverID'
+	getServers = 'SELECT * FROM ServerRegistration INNER JOIN Servers ON ServerRegistration.userID = $1 and Servers.serverID = ServerRegistration.serverID'
 	signIn = 'SELECT * FROM Users WHERE email = $1 and password = $2'
-	getPerms = 'SELECT * FROM ServerRegistration WHERE userID = CAST($1 AS INT) and serverID = CAST($2 AS INT)'
-	getRoles = 'SELECT ServerRegistration.Roles FROM ServerRegistration INNER JOIN Roles ON ServerRegistration.userID = CAST($1 AS INT) AND ServerRegistration.serverID = CAST($2 AS INT) AND Roles.id = ANY(ServerRegistration.roles)'
+	getPerms = 'SELECT * FROM ServerRegistration WHERE userID = $1 and serverID = $2'
+	getRoles = 'SELECT ServerRegistration.Roles FROM ServerRegistration INNER JOIN Roles ON ServerRegistration.userID = $1 AND ServerRegistration.serverID = $2 AND Roles.id = ANY(ServerRegistration.roles)'
 	joinServer = 'INSERT INTO ServerRegistration(userID, serverID) VALUES ($1, $2)'
-	getServer = 'SELECT * FROM Servers WHERE id = $1'
+	getServer = 'SELECT * FROM Servers WHERE serverID = $1'
 	joinRole = 'UPDATE ServerRegistration SET Roles = array_append(Roles, $1) WHERE userID = $2 AND serverID = $3 and (SELECT assignRoles FROM ServerRegistration WHERE serverID = $3 and userID = $4) = TRUE'
-	createRole = 'CASE WHEN (SELECT assignRoles FROM ServerRegistration WHERE serverID = $3 and userID = $4) = TRUE THEN INSERT INTO Roles (serverID, name, color) VALUES ($1, $2, $3)'
-	getRole = 'SELECT * FROM Roles WHERE id = $1'
-	createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES (CAST($1 AS INT), CURRENT_TIMESTAMP, $2) RETURNING id'
+	createRole = 'createRole($1, $2, $3, $4)'
+	getRole = 'SELECT * FROM Roles WHERE roleID = $1'
+	createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES ($1, CURRENT_TIMESTAMP, $2) RETURNING serverID'
 	changeChannelPermission = 'UPDATE ChannelPermissions SET $1 = $2 WHERE userID = $3 and channelID = $4 AND (SELECT canManageServer FROM ChannelPermissions WHERE channelID = $4 and userID = $5) RETURNING *'
 	changeServerPermission = 'UPDATE ServerRegistration SET $1 = $2 WHERE userID = $3 and serverID = $4 AND (SELECT canManageServer FROM ServerRegistration WHERE serverID = $4 and userID = $5) RETURNING *'
 	hasChannelPermission = 'SELECT $1 FROM ChannelPermissions WHERE userID = $2 and channelID = $3'
 	hasServerPermission = 'SELECT $1 FROM ServerRegistration WHERE userID = $2 and serverID = $3'
-	sendMessage = 'CASE WHEN (SELECT canTalk from ChannelPermissions WHERE channelID = $1 AND userID = $2) THEN INSERT INTO Messages (channelID, userID, contents, stamp) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING * '
-	editMessage = 'CASE WHEN (SELECT canTalk from ChannelPermissions WHERE channelID = $4 AND userID = $3) THEN UPDATE Messages SET contents = $1 WHERE id = $2 and userID = $3 RETURNING *'
-	deleteMessage = 'DELETE Messages WHERE id = $1 AND userID = $2'
+	sendMessage = 'sendMessage($1, $2, $3)'
+	editMessage = 'editMessage($1, $2, $3, $4)'
+	deleteMessage = 'deleteMessage($1, $2, $3, $4)'
 	# 1: messageID, 2 userID 3 channelID 4 unicode
 	addReaction = 'addReaction($1, $2, $3, $4)'
 
-	pinMessage = 'CASE WHEN (SELECT canTalk from ChannelPermissions WHERE channelID = $1 AND userID = $2) THEN UPDATE Messages SET pinned = $1 WHERE id = $2 AND userID = $3 RETURN *'
-	removeReaction1 = '''UPDATE Messages SET ARRAY_REMOVE(reactions, $1) WHERE id = (SELECT messageID FROM Reactions WHERE id = $1)'''
-	removeReaction2 = '''DELETE Reactions WHERE id = $1'''
+	pinMessage = 'pinMessage($1, $2, $3, $4)'
+	removeReaction1 = '''UPDATE Messages SET ARRAY_REMOVE(reactions, $1) WHERE messageID = (SELECT messageID FROM Reactions WHERE reactionID = $1)'''
+	removeReaction2 = '''DELETE Reactions WHERE reactionID = $1'''
 	createChannel = 'INSERT INTO Channels(name, serverID, createdAt) VALUES ($1, $2, CURRENT_TIMESTAMP) RETURN *'
 class Database(_Database):
 
@@ -408,8 +408,8 @@ class Database(_Database):
 		message = await self._fetch(_SQL.editMessage, content, messageID, userID)
 		return Message.fromDict(message[0])
 
-	async def deleteMessage(self, messageID: int, userID: int) -> None:
-		await self._execute(_SQL.deleteMessage, messageID, userID)
+	async def deleteMessage(self, messageID: int, userID: int, channelID: int, actor: int) -> None:
+		await self._execute(_SQL.deleteMessage, messageID, userID, channelID, actor)
 
 	async def addReaction(self, messageID: int, userID: int, channelID: int, unicode: str) -> Message:
 		message = await self._fetch(_SQL.addReaction, messageID, userID, channelID, unicode)
