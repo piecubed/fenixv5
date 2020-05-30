@@ -12,9 +12,11 @@ from typing import Any, Dict, List, Optional, Union
 from fenix import _protocolCore
 
 import datetime
+import json
 
 class BaseProtocol(_protocolCore.BaseMessage):
-	pass
+	def dumps(self) -> str:
+		return json.dumps(self._raw)
 
 serverMessages: _protocolCore.ProtocolHelper = _protocolCore.ProtocolHelper()
 
@@ -113,23 +115,17 @@ class MessageError(BaseProtocol):
 	Raised when a user tries to delete or edit a nonexistant message.
 	"""
 
+@serverMessages.add('BadFormat')
+class BadFormat(BaseProtocol):
+	"""
+	Raised when a user tries to send a message without the type field, without all the fields for the type, or with a nonexistant typeself.
+	"""
+	
 clientMessages: _protocolCore.ProtocolHelper = _protocolCore.ProtocolHelper()
 
 @clientMessages.add('changeSubscribedChannel')
 class ChangeSubscribedChannel(BaseProtocol):
 	channelID: int
-
-@clientMessages.add('signIn')
-class SignIn(BaseProtocol):
-	email: str
-	password: str
-	subscribedChannel: Optional[int] = None
-
-@clientMessages.add('signUp')
-class SignUp(BaseProtocol):
-	email: str
-	username: str
-	password: str
 
 @clientMessages.add('createChannel')
 class CreateChannel(BaseProtocol):

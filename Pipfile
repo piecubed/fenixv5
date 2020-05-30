@@ -13,6 +13,5 @@ sphinx-glpi-theme = "*"
 websockets = "*"
 asyncpg = "*"
 email_validator = "*"
-
-[requires]
-python_version = "3.8"
+protobuf = "*"
+aiohttp = "*"

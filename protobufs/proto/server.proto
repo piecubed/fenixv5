@@ -1,0 +1,15 @@
+// Protobuf files for Fenix
+//
+// © Copyright 2020 by piesquared
+
+syntax = "proto3";
+
+message RequestUserCount {
+    int64 id = 1;
+}
+
+message ReturnUserCount {
+    int64 id = 1;
+    int64 count = 2;
+}
+

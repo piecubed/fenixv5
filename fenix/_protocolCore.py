@@ -74,12 +74,14 @@ class BaseMessage(metaclass=_AutoSlotsMeta):
 	"""
 
 	__annotations: Dict[str, Any]
+	extension: str
+
 	def __init__(self, data: Dict[Any, Any]) -> None:
 		assert isinstance(data, dict)
 		for attr, attr_type in self.__annotations.items():
 			if attr not in data:
 				if not hasattr(self, attr):
-					raise KeyError(attr)
+					raise IncompletePacket(attr)
 				setattr(self, attr, copy.deepcopy(getattr(self, attr)))
 				continue
 
@@ -87,6 +89,7 @@ class BaseMessage(metaclass=_AutoSlotsMeta):
 			if not _isinstance(value, attr_type):
 				raise TypeError(f'Expected {attr_type!r}, got {value!r}')
 			setattr(self, attr, value)
+		self._raw = data
 
 	def __iter__(self) -> Iterator[Any]:
 		for attr in self.__class__.__annotations:
@@ -97,7 +100,7 @@ class ProtocolHelper:
 	def __init__(self) -> None:
 		self.types: Dict[str, Type[BaseMessage]] = {}
 
-	def add(self, *names: str) -> Callable[[Type[BaseMessage]],
+	def add(self, *names: str, extension: str = 'main') -> Callable[[Type[BaseMessage]],
 			Type[BaseMessage]]:
 		"""
 		A decorator to add packet types.
@@ -110,18 +113,20 @@ class ProtocolHelper:
 		def wrapper(cls: Type[BaseMessage]) -> Type[BaseMessage]:
 			for name in names:
 				self.types[name] = cls
+				cls.extension = extension
 			return cls
 		return wrapper
 
-	def get(self, packet: Dict[Any, Any]) -> Optional[BaseMessage]:
+	def get(self, packet: Dict[Any, Any]) -> BaseMessage:
 		"""
-		Gets a packet object of the correct type for a certain packet. Returns
-		None if the packet type doesn't exist.
+		Gets a packet object of the correct type for a certain packet. Raises a typeError if the type doesnt exist.
 		"""
 		try:
 			typ = self.types[packet['type']]
 		except KeyError:
-			return None
+			raise TypeError
 
 		return typ(packet)
 
+class IncompletePacket(Exception):
+	pass

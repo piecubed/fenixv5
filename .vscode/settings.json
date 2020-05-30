@@ -8,7 +8,9 @@
     "--show-column-numbers",
     "--strict",
     "--allow-subclassing-any",
-    "--allow-untyped-decorators"
+    "--allow-untyped-decorators",
+    "--allow-redefinition"
+
   ],
   "python.testing.unittestArgs": [
     "-v",
@@ -20,5 +22,8 @@
   "python.testing.pytestEnabled": false,
   "python.testing.nosetestsEnabled": false,
   "python.testing.unittestEnabled": true,
-  "restructuredtext.confPath": "${workspaceFolder}/docs"
+  "restructuredtext.confPath": "${workspaceFolder}/docs",
+  "python.pipenvPath": "pipenv",
+  "python.formatting.provider": "black",
+  "python.pythonPath": "/home/matthewfrancis/.local/share/virtualenvs/phoenixwebsocket-LaHswLf8/bin/python"
 }

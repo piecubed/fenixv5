@@ -1,0 +1,101 @@
+// Protobuf files for Fenix
+//
+// © Copyright 2020 by piesquared
+
+syntax = "proto3";
+
+message Fenix {
+    int32 version = 1;
+    int64 id = 2;
+
+    oneof data {
+        SetFocusedChannel sfc = 3;
+        ReactionAdded ra = 4;
+        MessageSent ms = 5;
+        Channel c = 6;
+        Server s = 7;
+        AuthorizedUser au = 8;
+        BasicUser bu = 9;
+
+
+
+    }
+}
+message SetFocusedChannel {
+    int64 channelID = 1;
+}
+
+message Unauthorized {
+
+}
+
+
+message MessageSent {
+    string avatar = 1;
+    string nick = 2;
+    int64 messageID = 3;
+    string content = 4;
+    string timestamp = 5;
+    int64 channelID = 6;
+}
+
+message MessageEdited {
+    int64 messageID = 1;
+    string content = 2;
+}
+
+message MessageDeleted {
+    int64 messageID = 1;
+}
+
+message AuthorizedUser {
+    string username = 1;
+    string email = 2;
+    map<string, UserSetting> settings = 3;
+    string token = 4;
+    int64 usernameHash = 5;
+    string createdAt = 6;
+    bool verified = 7;
+    map<string, Server> servers = 8;
+}
+
+message ReactionAdded {
+    int64 messageID = 1;
+    int32 numberOfReactions = 2;
+    string emoji = 3;
+}
+
+message Server {
+    int64 serverID = 1;
+    repeated Channel channels = 2;
+    repeated BasicUser users = 3;
+    string serverAvatar = 4;
+    string serverName = 5;
+}
+
+message Channel {
+    int64 channelID = 1;
+    string channelName = 2;
+    string categoryName = 3;
+    repeated ChannelHistory history = 4;
+}
+
+message ChannelHistory {
+    int64 messageID = 1;
+    int64 userID = 2;
+    string content = 3;
+    string timestamp = 4;
+    string avatar = 5;
+    string nick = 6;
+}
+
+message BasicUser {
+    int64 userID = 1;
+    int64 roleID = 2;
+    string avatar = 3;
+    string nick = 4;
+}
+
+message UserSetting {
+    bool setting = 1;
+}
