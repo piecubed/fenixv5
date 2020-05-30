@@ -22,17 +22,21 @@ from email_validator import EmailNotValidError, validate_email
 
 class Dataclass:
 
+	_slots: Tuple[str, ...]
+	_raw: Dict[str, Any]
 	def __iter__(self) -> Iterator[Any]:
 		yield from self.__annotations__
 
 	@classmethod
-	def fromDict(cls, source: Dict[str, Any]): #type: ignore
+	def fromDict(cls, source: Dict[str, Any]):  #type: ignore
 		self = cls()
-		for method in self:
-			setattr(self, method.lower(), source[method])
+		self._raw = source
+		for i in range(len(self._slots)):
+			setattr(self, self._slots[i], source[self._slots[i].lower()])
 		return self
 
 class User(Dataclass):
+	_slots = ('userID', 'username', 'password', 'email', 'salt', 'settings', 'token', 'usernameHash', 'createdAt', 'verified')
 
 	userID: int
 	username: str
@@ -44,7 +48,7 @@ class User(Dataclass):
 	usernameHash: str
 	createdAt: datetime.datetime
 	verified: bool
-	servers: Dict[str, 'Server']
+	focusedChannel: int
 
 	@classmethod
 	def fromDict(cls, source: Dict[str, Any]) -> 'User':
@@ -57,11 +61,11 @@ class AuthUtils:
 
 
 class Server(Dataclass):
+	_slots = ('serverID', 'name', 'createdAt')
 
 	serverID: int
 	name: str
 	createdAt: datetime.datetime
-	settings: Dict[str, Any]
 
 	@classmethod
 	def fromDict(cls, source: Dict[str, Any]) -> 'Server':
@@ -85,6 +89,8 @@ class Server(Dataclass):
 		return servers
 
 class Role(Dataclass):
+	_slots = ('name', 'color', 'roleID')
+
 	name: str
 	color: str
 	roleID: int
@@ -113,6 +119,8 @@ class Role(Dataclass):
 serverRegistrationWhiteList: Tuple[str, ...] = ('admin', 'addChannels', 'assignRoles', 'kick', 'ban', 'changeNick', 'changeOthersNick')
 
 class ServerRegistration(Dataclass):
+
+	_slots = ('userID', 'serverID', 'roles', 'admin', 'addChannels', 'assignRoles', 'kick', 'ban', 'changeNick', 'changeOthersNick')
 	userID: int
 	serverID: int
 	roles: List[int]
@@ -138,6 +146,9 @@ class ServerRegistration(Dataclass):
 channelPermissionsWhiteList: Tuple[str, ...] = ('canRead', 'canTalk', 'canReadHistory', 'canDeleteMessages', 'canManageChannel', 'canPinMessages', 'canMentionEveryone')
 
 class ChannelPermissions(Dataclass):
+
+	_slots = ('userID', 'channelID', 'canRead', 'canTalk', 'canReadHistory', 'canDeleteMessage', 'canManageChannel', 'canManagePermissions', 'canPinMessages,'
+			  'canMenthonEveryone', 'canAddReactions')
 	userID: int
 	channelID: int
 	canRead: bool
@@ -156,6 +167,8 @@ class ChannelPermissions(Dataclass):
 		return super().fromDict(source) #type: ignore
 
 class Message(Dataclass):
+
+	_slots = ('userID', 'channelID', 'content', 'timestamp', 'pinned', 'reactions')
 	userID: int
 	channelID: int
 	content: str
@@ -177,6 +190,8 @@ class Reaction(Dataclass):
 		return super().fromDict(source) #type: ignore
 
 class Channel(Dataclass):
+
+	_slots = ('channelID', 'name', 'serverID', 'createdAt')
 	channelID: int
 	name: str
 	serverID: int
@@ -219,23 +234,25 @@ class _SQL:
 	joinServer = 'INSERT INTO ServerRegistration(userID, serverID) VALUES ($1, $2)'
 	getServer = 'SELECT * FROM Servers WHERE serverID = $1'
 	joinRole = 'UPDATE ServerRegistration SET Roles = array_append(Roles, $1) WHERE userID = $2 AND serverID = $3 and (SELECT assignRoles FROM ServerRegistration WHERE serverID = $3 and userID = $4) = TRUE'
-	createRole = 'createRole($1, $2, $3, $4)'
+	createRole = 'SELECT createRole($1, $2, $3, $4)'
 	getRole = 'SELECT * FROM Roles WHERE roleID = $1'
 	createServer = 'INSERT INTO Servers (ownerID, createdAt, name) VALUES ($1, CURRENT_TIMESTAMP, $2) RETURNING serverID'
 	changeChannelPermission = 'UPDATE ChannelPermissions SET $1 = $2 WHERE userID = $3 and channelID = $4 AND (SELECT canManageServer FROM ChannelPermissions WHERE channelID = $4 and userID = $5) RETURNING *'
 	changeServerPermission = 'UPDATE ServerRegistration SET $1 = $2 WHERE userID = $3 and serverID = $4 AND (SELECT canManageServer FROM ServerRegistration WHERE serverID = $4 and userID = $5) RETURNING *'
 	hasChannelPermission = 'SELECT $1 FROM ChannelPermissions WHERE userID = $2 and channelID = $3'
 	hasServerPermission = 'SELECT $1 FROM ServerRegistration WHERE userID = $2 and serverID = $3'
-	sendMessage = 'sendMessage($1, $2, $3)'
-	editMessage = 'editMessage($1, $2, $3, $4)'
-	deleteMessage = 'deleteMessage($1, $2, $3, $4)'
+	sendMessage = 'SELECT sendMessage($1, $2, $3)'
+	editMessage = 'SELECT editMessage($1, $2, $3, $4)'
+	deleteMessage = 'SELECT deleteMessage($1, $2, $3, $4)'
 	# 1: messageID, 2 userID 3 channelID 4 unicode
-	addReaction = 'addReaction($1, $2, $3, $4)'
+	addReaction = 'SELECT addReaction($1, $2, $3, $4)'
 
-	pinMessage = 'pinMessage($1, $2, $3, $4)'
+	pinMessage = 'SELECT pinMessage($1, $2, $3, $4)'
 	removeReaction1 = '''UPDATE Messages SET ARRAY_REMOVE(reactions, $1) WHERE messageID = (SELECT messageID FROM Reactions WHERE reactionID = $1)'''
 	removeReaction2 = '''DELETE Reactions WHERE reactionID = $1'''
-	createChannel = 'INSERT INTO Channels(name, serverID, createdAt) VALUES ($1, $2, CURRENT_TIMESTAMP) RETURN *'
+	createChannel = 'INSERT INTO Channels(name, serverID, createdAt) VALUES ($1, $2, CURRENT_TIMESTAMP) RETURNING *'
+	fetchUserByToken = 'SELECT * FROM Users WHERE token = $1'
+
 class Database(_Database):
 
 	async def fetchUserByEmail(self, email: str) -> User:
@@ -269,10 +286,27 @@ class Database(_Database):
 		salt = secrets.token_hex(32).encode('utf-8')
 		token = secrets.token_hex(128)
 		hash: bytes = AuthUtils.checkPassword(password.encode('utf-8'), salt)
-
-		user = await self._fetch(_SQL.signUp, username, hash, email, salt, token)
+		try:
+			user = await self._fetch(_SQL.signUp, username, hash, email, salt, token)
+		except asyncpg.UniqueViolationError:
+			raise UserExists
 
 		return User.fromDict(user[0])
+	async def fetchUserByToken(self, token: str) -> User:
+		user: List[asyncpg.Record] = await self._fetch(_SQL.fetchUserByToken, token)
+
+		if len(user) == 0:
+			raise UserNotFound
+
+		return User.fromDict(user[0])
+
+	async def tokenSignIn(self, token: str) -> User:
+		user: User = await self.fetchUserByToken(token)
+
+		if user.token != token:
+			raise InvalidCredentials
+
+		return user
 
 	async def signIn(self, email: str, password: str) -> User:
 		user: User = await self.fetchUserByEmail(email)
@@ -350,10 +384,10 @@ class Database(_Database):
 	async def createServer(self, userID: int, name: str) -> Server:
 		self.validate(name)
 
-		serverID = await self._fetch(_SQL.createServer, int(userID), name)
+		serverID = (await self._fetch(_SQL.createServer, int(userID), name))[0]['serverid']
 		await self.createChannel(serverID, "General")
 
-		server = await self.getServer(serverID[0]['id'])
+		server = await self.getServer(serverID)
 
 		return server
 
@@ -422,7 +456,7 @@ class Database(_Database):
 
 	async def createChannel(self, serverID: int, name: str) -> Channel:
 		channel = await self._fetch(_SQL.createChannel, name, serverID)
-		return Channel.fromDict(channel)
+		return Channel.fromDict(channel[0])
 
 class CannotTalk(Exception):
 	pass
@@ -443,4 +477,7 @@ class UserNotFound(Exception):
 	pass
 
 class InvalidCredentials(Exception):
+	pass
+
+class UserExists(Exception):
 	pass
