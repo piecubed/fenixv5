@@ -17,13 +17,15 @@
     "-s",
     "./tests",
     "-p",
-    "*test.py"
+    "*test*.py"
   ],
   "python.testing.pytestEnabled": false,
   "python.testing.nosetestsEnabled": false,
   "python.testing.unittestEnabled": true,
   "restructuredtext.confPath": "${workspaceFolder}/docs",
   "python.pipenvPath": "pipenv",
-  "python.formatting.provider": "black",
+  "python.formatting.provider": "yapf",
+  "python.formatting.yapfArgs": ["-p", "-r"],
+  "python.analysis.memory.keepLibraryAst": true,
   "python.pythonPath": "/home/matthewfrancis/.local/share/virtualenvs/phoenixwebsocket-LaHswLf8/bin/python"
 }
