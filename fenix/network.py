@@ -14,6 +14,7 @@ import fenix.database as database
 from fenix._protocolCore import IncompletePacket
 from fenix.protocol import *
 from fenix.recaptcha import RECaptcha
+import uuid
 
 
 class MainExt(Extension):
@@ -21,7 +22,13 @@ class MainExt(Extension):
     Main extension that defines server interaction, message sending, and channel interaction.
     """
     def __init__(self, core: FenixCore) -> None:
-        self.core = core
+        self.core: FenixCore = core
+        self.database: database.Database = self.core.database
+
+    async def changeSubscribedChannel(self, message: ChangeSubscribedChannel,
+                                      conn: Connection) -> None:
+        self.database.changeSubscribedChannel(channelID = message.channelID,
+                                              userID = conn.user.userID, sessionID = conn.sessionID)
 
     async def handle(self, message: BaseProtocol, conn: Connection) -> None:
         pass
@@ -43,11 +50,37 @@ class Connection:
         self.ws = websocket
         self.user = user
         self.core = core
+        self.sessionID: str = str(uuid.uuid4())
 
     async def send(self, payload: BaseProtocol) -> None:
         await self.ws.send(payload.dumps())
 
     async def main(self) -> None:
+        try:
+            focusedChannel = int(self.ws.request_headers['focusedChannel'])
+        except (ValueError, KeyError):
+            return await self.ws.close(
+                code=1008, reason='No focusedChannel header present!')
+
+        if focusedChannel == 0:
+            focusedChannel = 1
+
+        # Add our sessionID
+        await self.core.database.createSession(
+                                               userID=self.user.userID,
+                                               sessionID=self.sessionID
+                                              )
+
+        # Our user should always be authenticated, so Fenix sends the fully authorized user.
+        # Flow of authenticatsion would be something like this:
+        # client sends HTTP upgrade request at /token, /password, /signUp with the appropiate headers.
+        # If any of the headers are invalid, Fenix will abort the upgrade request, and return a HTTP error.
+        # If all the headers are present, Fenix will attempt to authenticate for the specified user.
+        # If authentication fails, Fenix will abort the upgrade reuqest, and return an HTTP error.
+        # If authentication succeeds, Fenix will not return any HTTP header from our upgrade handler, and the connection will be
+        # transformed into a websocket normally.
+        # Fenix then gets the user object from the lingering HTTP headers accessible from the websocket object and sends a AuthUser
+        # message to the client as the first message, and then starts listening.
         await self.send(AuthUser(self.user._raw))
 
         async for raw in self.ws:
@@ -76,12 +109,11 @@ class FenixCore:
         user: database.User
         if path == '/password' or path == '/signUp':
             email = websocket.request_headers['email']
-            user = await self.database.fetchUserByEmail(email)
+            user = await self.database.fetchUserByEmail(email=email)
 
         elif path == '/token':
             token = websocket.request_headers['token']
-            user = await self.database.fetchUserByToken(
-                token)
+            user = await self.database.fetchUserByToken(token=token)
         else:
             print(path, 'got through the filter.')
             return await websocket.close(
@@ -91,7 +123,7 @@ class FenixCore:
 
         await self.connections[user.userID].main()
 
-    async def handleHTTP( #type: ignore
+    async def handleHTTP(  #type: ignore
         self, path: str, request_headers: Headers
     ) -> Tuple[HTTPStatus, Union[Headers, Mapping[str, str], Iterable[Tuple[
             str, str]]], bytes]:
@@ -105,7 +137,7 @@ class FenixCore:
                 headers['error'] = 'No token header present'
                 return (status, headers, b'')
             try:
-                await self.database.tokenSignIn(token)
+                await self.database.tokenSignIn(token=token)
             except database.InvalidCredentials:
                 status = HTTPStatus.UNAUTHORIZED
                 headers = Headers()
@@ -129,7 +161,7 @@ class FenixCore:
                 headers['error'] = 'No password header present'
                 return (status, headers, b'')
             try:
-                await self.database.signIn(email, password)
+                await self.database.signIn(email=email, password=password)
             except database.InvalidCredentials:
                 status = HTTPStatus.UNAUTHORIZED
                 headers = Headers()
@@ -175,7 +207,7 @@ class FenixCore:
                 headers['error'] = 'Invalid response token.'
                 return (status, headers, b'')
             try:
-                await self.database.signUp(username, password, email)
+                await self.database.signUp(username=username, password=password, email=email)
             except database.UserExists:
                 status = HTTPStatus.FORBIDDEN
                 headers = Headers()
@@ -184,7 +216,6 @@ class FenixCore:
         else:
             status = HTTPStatus.NOT_FOUND
             return (status, Headers(), b'')
-
 
     async def connect(self) -> None:
         websockets.serve(ws_handler=self.handleWebsocket)

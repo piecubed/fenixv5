@@ -10,7 +10,7 @@ import datetime
 import hashlib
 import secrets
 from typing import Any, Dict, List, Tuple, Iterator
-
+from enum import Enum
 try:
     import fenix.conf as conf
     password = conf.databasePassword
@@ -110,7 +110,7 @@ class Role(Dataclass):
     def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[int, 'Role']:
         roles: Dict[int, 'Role'] = {}
         for raw in source:
-            role = cls.fromDict(raw)
+            role: 'Role' = cls.fromDict(raw)
             roles[role.roleID] = role
 
         return roles
@@ -158,15 +158,6 @@ class ServerRegistration(Dataclass):
 
         return serverRegistration
 
-
-channelPermissionsWhiteList: Tuple[str, ...] = ('canRead', 'canTalk',
-                                                'canReadHistory',
-                                                'canDeleteMessages',
-                                                'canManageChannel',
-                                                'canPinMessages',
-                                                'canMentionEveryone')
-
-
 class ChannelPermissions(Dataclass):
 
     _slots = ('userID', 'channelID', 'canRead', 'canTalk', 'canReadHistory',
@@ -188,6 +179,18 @@ class ChannelPermissions(Dataclass):
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'ChannelPermissions':
         return super().fromDict(source)  #type: ignore
+
+
+class ChannelPermissionEnum(Enum):
+    read = 'canRead'
+    talk = 'canTalk'
+    readHistory = 'canReadHistory'
+    deleteMessages = 'canDeleteMessages'
+    manageChannel = 'canManageChannel'
+    managePermissions = 'canManagePermissions'
+    pinMessages = 'canPinMessages'
+    mentionEveryone = 'canMentionEveryone'
+    addReactions = 'canAddReactions'
 
 
 class Message(Dataclass):
@@ -275,9 +278,7 @@ class _SQL:
     sendMessage = 'SELECT sendMessage($1, $2, $3)'
     editMessage = 'SELECT editMessage($1, $2, $3, $4)'
     deleteMessage = 'SELECT deleteMessage($1, $2, $3, $4)'
-    # 1: messageID, 2 userID 3 channelID 4 unicode
     addReaction = 'SELECT addReaction($1, $2, $3, $4)'
-
     pinMessage = 'SELECT pinMessage($1, $2, $3, $4)'
     removeReaction1 = '''UPDATE Messages SET ARRAY_REMOVE(reactions, $1) WHERE messageID = (SELECT messageID FROM Reactions WHERE reactionID = $1)'''
     removeReaction2 = '''DELETE Reactions WHERE reactionID = $1'''
@@ -286,18 +287,18 @@ class _SQL:
 
 
 class Database(_Database):
-    async def fetchUserByEmail(self, email: str) -> User:
+    async def fetchUserByEmail(self, *, email: str) -> User:
         query = await self._fetch(_SQL.fetchUserByEmail, email)
         try:
             return User.fromDict(query[0])
         except (IndexError, KeyError):
             raise UserNotFound(f'{email} is not registered!')
 
-    async def __validate(self, username: str, password: bytes,
+    async def __validate(self, *, username: str, password: bytes,
                          email: str) -> None:
         # Check if the user is already registered
         try:
-            await self.fetchUserByEmail(email)
+            await self.fetchUserByEmail(email=email)
             raise InvalidCredentials
         except UserNotFound:
             pass
@@ -312,8 +313,11 @@ class Database(_Database):
         except EmailNotValidError:
             raise InvalidCredentials from None
 
-    async def signUp(self, username: str, password: str, email: str) -> User:
-        await self.__validate(username, password.encode('utf-8'), email)
+    async def signUp(self, *, username: str, password: str,
+                     email: str) -> User:
+        await self.__validate(username=username,
+                              password=password.encode('utf-8'),
+                              email=email)
 
         salt = secrets.token_hex(32).encode('utf-8')
         token = secrets.token_hex(128)
@@ -326,7 +330,30 @@ class Database(_Database):
 
         return User.fromDict(user[0])
 
-    async def fetchUserByToken(self, token: str) -> User:
+    async def createSession(self,
+                            channelID: int = 0,
+                            *,
+                            userID: int,
+                            sessionID: str = '') -> None:
+
+        if channelID != 0:
+            if await self.hasChannelPermission(permission=ChannelPermissionEnum.read, userID=userID, channelID=channelID):
+                return await self._execute(
+                    'INSERT INTO FocusedChannels(sessionID, channelID, userID) VALUES ($1, $2, $3)',
+                    sessionID, channelID, userID)
+            raise ActorNotAuthorized()
+        else:
+            await self._execute(
+                'INSERT INTO FocusedChannels(sessionID, userID) VALUES($1, $2)'
+            )
+
+    async def deleteSession(self, *, sessionID: str) -> None:
+        assert sessionID != ''
+
+        await self._execute('DELETE FROM FocusedChannels WHERE sessionID = $1',
+                            sessionID)
+
+    async def fetchUserByToken(self, *, token: str) -> User:
         user: List[asyncpg.Record] = await self._fetch(_SQL.fetchUserByToken,
                                                        token)
 
@@ -335,16 +362,16 @@ class Database(_Database):
 
         return User.fromDict(user[0])
 
-    async def tokenSignIn(self, token: str) -> User:
-        user: User = await self.fetchUserByToken(token)
+    async def tokenSignIn(self, *, token: str) -> User:
+        user: User = await self.fetchUserByToken(token=token)
 
         if user.token != token:
             raise InvalidCredentials
 
         return user
 
-    async def signIn(self, email: str, password: str) -> User:
-        user: User = await self.fetchUserByEmail(email)
+    async def signIn(self, *, email: str, password: str) -> User:
+        user: User = await self.fetchUserByEmail(email=email)
 
         hash: bytes = AuthUtils.checkPassword(password.encode('utf-8'),
                                               user.salt)
@@ -354,7 +381,7 @@ class Database(_Database):
 
         return user
 
-    async def getServers(self, id: int) -> Dict[int, Server]:
+    async def getServers(self, *, id: int) -> Dict[int, Server]:
         servers = await self._fetch(_SQL.getServers, id)
 
         try:
@@ -363,11 +390,12 @@ class Database(_Database):
         except KeyError:
             return {}
 
-    async def getPerms(self, userID: int, serverID: int) -> ServerRegistration:
+    async def getPerms(self, *, userID: int,
+                       serverID: int) -> ServerRegistration:
         perms = await self._fetch(_SQL.getPerms, userID, serverID)
         return ServerRegistration.fromDict(perms)
 
-    async def getRoles(self, userID: int, serverID: int) -> Dict[int, Role]:
+    async def getRoles(self, *, userID: int, serverID: int) -> Dict[int, Role]:
         roles = await self._fetch(_SQL.getRoles, userID, serverID)
 
         try:
@@ -376,7 +404,7 @@ class Database(_Database):
         except KeyError:
             return {}
 
-    async def getServersList(self, id: int) -> List[Server]:
+    async def getServersList(self, *, id: int) -> List[Server]:
         servers = await self._fetch(_SQL.getServers, id)
 
         try:
@@ -385,12 +413,12 @@ class Database(_Database):
         except KeyError:
             return []
 
-    async def getPermsList(self, userID: int,
+    async def getPermsList(self, *, userID: int,
                            serverID: int) -> List[ServerRegistration]:
         perms = await self._fetch(_SQL.getPerms, userID, serverID)
         return ServerRegistration.fromListToList(perms)
 
-    async def getRolesList(self, userID: int, serverID: int) -> List[Role]:
+    async def getRolesList(self, *, userID: int, serverID: int) -> List[Role]:
         roles = await self._fetch(_SQL.getRoles, userID, serverID)
 
         try:
@@ -399,48 +427,46 @@ class Database(_Database):
         except KeyError:
             return []
 
-    async def joinServer(self, userID: int, serverID: int) -> Server:
+    async def joinServer(self, *, userID: int, serverID: int) -> Server:
         await self._execute(_SQL.joinServer, userID, serverID)
         server = await self._fetch(_SQL.getServer, int(serverID))
 
         return Server.fromDict(server[0])
 
-    async def joinRole(self, userID: int, serverID: int, roleID: int,
+    async def joinRole(self, *, userID: int, serverID: int, roleID: int,
                        actor: int) -> Role:
         await self._execute(_SQL.joinRole, roleID, userID, serverID)
         role = await self._fetch(_SQL.getRole, roleID)
         return Role.fromDict(role)
 
-    def validate(self, name: str) -> None:
+    def validate(self, *, name: str) -> None:
         if len(name) > 40:
             raise InvalidServerName
 
-    async def getServer(self, serverID: int) -> Server:
+    async def getServer(self, *, serverID: int) -> Server:
         server = await self._fetch(_SQL.getServer, serverID)
         return Server.fromDict(server[0])
 
-    async def createServer(self, userID: int, name: str) -> Server:
-        self.validate(name)
+    async def createServer(self, *, userID: int, name: str) -> Server:
+        self.validate(name=name)
 
         serverID = (await self._fetch(_SQL.createServer, int(userID),
                                       name))[0]['serverid']
-        await self.createChannel(serverID, "General")
+        await self.createChannel(serverID=serverID, name="General")
 
-        server = await self.getServer(serverID)
+        server = await self.getServer(serverID=serverID)
 
         return server
 
-    async def hasChannelPermission(self, permission: str, userID: int,
+    async def hasChannelPermission(self, *, permission: ChannelPermissionEnum, userID: int,
                                    channelID: int) -> bool:
-        if permission not in channelPermissionsWhiteList:
-            raise InvalidPermissionName
 
         permissions = await self._fetch(_SQL.hasChannelPermission, permission,
                                         userID, channelID)
 
         return bool(permissions[0])
 
-    async def hasServerPermission(self, permission: str, userID: int,
+    async def hasServerPermission(self, *, permission: str, userID: int,
                                   serverID: int) -> bool:
         if permission not in serverRegistrationWhiteList:
             raise InvalidPermissionName
@@ -450,11 +476,9 @@ class Database(_Database):
 
         return bool(permissions[0])
 
-    async def changechannelPermission(self, permission: str, value: bool,
+    async def changeChannelPermission(self, *, permission: ChannelPermissionEnum, value: bool,
                                       userID: int, channelID: int,
                                       actor: int) -> ChannelPermissions:
-        if permission not in channelPermissionsWhiteList:
-            raise InvalidPermissionName
 
         permissions = await self._fetch(_SQL.changeChannelPermission,
                                         permission, value, userID, channelID,
@@ -465,7 +489,7 @@ class Database(_Database):
 
         return ChannelPermissions.fromDict(permissions[0])
 
-    async def changeServerPermission(self, permission: str, value: bool,
+    async def changeServerPermission(self, *, permission: str, value: bool,
                                      userID: int, serverID: int,
                                      actor: int) -> ServerRegistration:
         if permission not in serverRegistrationWhiteList:
@@ -480,7 +504,7 @@ class Database(_Database):
 
         return ServerRegistration.fromDict(permissions[0])
 
-    async def sendMessage(self, content: str, userID: int,
+    async def sendMessage(self, *, content: str, userID: int,
                           channelID: int) -> Message:
         if len(content) >= 1000:
             raise MessageTooLong
@@ -488,7 +512,7 @@ class Database(_Database):
                                     content)
         return Message.fromDict(message[0])
 
-    async def editMessage(self, messageID: int, userID: int,
+    async def editMessage(self, *, messageID: int, userID: int,
                           content: str) -> Message:
         if len(content) >= 1000:
             raise MessageTooLong
@@ -497,25 +521,33 @@ class Database(_Database):
                                     userID)
         return Message.fromDict(message[0])
 
-    async def deleteMessage(self, messageID: int, userID: int, channelID: int,
-                            actor: int) -> None:
+    async def deleteMessage(self, *, messageID: int, userID: int,
+                            channelID: int, actor: int) -> None:
         await self._execute(_SQL.deleteMessage, messageID, userID, channelID,
                             actor)
 
-    async def addReaction(self, messageID: int, userID: int, channelID: int,
+    async def addReaction(self, *, messageID: int, userID: int, channelID: int,
                           unicode: str) -> Message:
         message = await self._fetch(_SQL.addReaction, messageID, userID,
                                     channelID, unicode)
 
         return Message.fromDict(message[0])
 
-    async def removeReaction(self, reactionID: int) -> None:
+    async def removeReaction(self, *, reactionID: int) -> None:
         await self._execute(_SQL.removeReaction1, reactionID)
         await self._execute(_SQL.removeReaction2, reactionID)
 
-    async def createChannel(self, serverID: int, name: str) -> Channel:
+    async def createChannel(self, *, serverID: int, name: str) -> Channel:
         channel = await self._fetch(_SQL.createChannel, name, serverID)
         return Channel.fromDict(channel[0])
+
+    async def changeSubscribedChannel(self, *, channelID: int, userID: int,
+                                      sessionID: str) -> None:
+        if await self.hasChannelPermission(permission=ChannelPermissionEnum.read, userID=userID, channelID=channelID):
+            return await self._execute(
+                'UPDATE FocusedChannels SET channelID = $1 WHERE userID = $2 and sessionID = $3',
+                channelID, userID, sessionID)
+        raise ActorNotAuthorized()
 
 
 class CannotTalk(Exception):

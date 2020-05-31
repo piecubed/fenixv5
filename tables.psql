@@ -11,7 +11,6 @@ CREATE TABLE Users(
     usernameHash SERIAL UNIQUE,
     createdAt TIMESTAMP NOT NULL,
     verified BOOLEAN NOT NULL,
-    focusedChannel INT NOT NULL
 );
 
 DROP TABLE IF EXISTS Channels;
@@ -20,6 +19,13 @@ CREATE TABLE Channels(
     name TEXT NOT NULL,
     serverID INT NOT NULL,
     createdAt TIMESTAMP NOT NULL
+);
+
+DROP TABLE IF EXISTS FocusedChannels;
+CREATE TABLE FocusedChannels (
+    sessionID TEXT PRIMARY KEY,
+    channelID INT,
+    userID INT
 );
 
 DROP TABLE IF EXISTS Servers;
