@@ -25,12 +25,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install pipenv
         pipenv install --skip-lock
-        
+
     - name: Lint with mypy
       run: |
         pip install mypy
-        mypy fenix/ --strict --show-column-numbers --pretty --ignore-missing-imports --allow-subclassing-any --allow-untyped-decorations
-        
+        mypy fenix/ --strict --allow-redefinition --show-column-numbers --pretty --ignore-missing-imports --allow-subclassing-any --allow-untyped-decorators
+
     - name: Setup PostgreSQL
       uses: Harmon758/postgresql-action@v1.0.0
       with:
