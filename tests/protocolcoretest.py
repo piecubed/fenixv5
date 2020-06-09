@@ -1,6 +1,8 @@
-import unittest
-from fenix._protocol_core import BaseMessage, _isinstance
 import typing
+import unittest
+
+from fenix._protocol_core import BaseMessage, _isinstance
+
 
 class ProtocolCoreTest(unittest.TestCase):
 	def test_isinstance(self) -> None:

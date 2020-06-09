@@ -9,17 +9,19 @@ import base64
 import datetime
 import hashlib
 import secrets
-from typing import Any, Dict, List, Tuple, Iterator
 from enum import Enum
+from typing import Any, Dict, Iterator, List, Tuple
+
+import asyncpg
+from email_validator import EmailNotValidError, validate_email
+from emoji.unicode_codes import EMOJI_UNICODE
+
 try:
     import fenix.conf as conf
     password = conf.databasePassword
 except ImportError:
     password = 'test'
 
-import asyncpg
-from email_validator import EmailNotValidError, validate_email
-from emoji.unicode_codes import EMOJI_UNICODE
 
 class Dataclass:
 

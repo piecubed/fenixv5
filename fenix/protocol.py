@@ -7,12 +7,12 @@
 # Optional __future__ import for testing
 from __future__ import annotations
 
+import datetime
+import json
 from typing import Any, Dict, List, Optional, Union
 
 from fenix import _protocolCore
 
-import datetime
-import json
 
 class BaseProtocol(_protocolCore.BaseMessage):
     def dumps(self) -> str:

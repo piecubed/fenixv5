@@ -1,7 +1,9 @@
 import abc
+
+from fenix.connection import Connection
 from fenix.network import FenixCore
 from fenix.protocol import BaseProtocol
-from fenix.connection import Connection
+
 
 class Extension(abc.ABC):
     @abc.abstractmethod

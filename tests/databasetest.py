@@ -1,6 +1,8 @@
 import unittest
+
 from asyncTests import asyncTest
-from fenix.database import Database, User, Server
+from fenix.database import Database, Server, User
+
 
 class UserDatabaseTests(unittest.TestCase):
 

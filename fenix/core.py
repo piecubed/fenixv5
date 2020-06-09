@@ -3,22 +3,23 @@ import asyncio
 import datetime
 import http
 import json
+import uuid
 from http import HTTPStatus
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple, Union
 
 import websockets
 import websockets.auth
-from websockets.http import Headers
 import websockets.exceptions
+from websockets.http import Headers
 
 import fenix.database as database
 from fenix._protocolCore import IncompletePacket
-from fenix.protocol import *
-from fenix.recaptcha import RECaptcha
-import uuid
 from fenix.connection import Connection
 from fenix.extension import Extension
 from fenix.extensions.main import MainExt
+from fenix.protocol import *
+from fenix.recaptcha import RECaptcha
+
 
 class FenixCore:
     def __init__(self, extensions: Dict[str, Extension]) -> None:

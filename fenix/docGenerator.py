@@ -1,5 +1,7 @@
 import inspect
+
 import database
+
 print(dir(database.Database))
 	  
 def getMarkDown(method: str) -> str:

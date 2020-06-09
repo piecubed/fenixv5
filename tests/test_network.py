@@ -1,5 +1,7 @@
-import tester
 import websockets
+
+import tester
+
 
 async def connect(base: str) -> None:
     await websockets.connect(base)

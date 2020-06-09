@@ -1,8 +1,9 @@
 import asyncio
-import traceback
-import time
 import functools
-from typing import List, Dict, Any, Callable
+import time
+import traceback
+from typing import Any, Callable, Dict, List
+
 
 class Tester:
     __tests: List[Dict[str, Any]] = []

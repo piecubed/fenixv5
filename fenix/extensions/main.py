@@ -1,8 +1,9 @@
-from fenix.core import FenixCore
 from fenix import database
 from fenix.connection import Connection
-from fenix.protocol import *
+from fenix.core import FenixCore
 from fenix.extension import Extension
+from fenix.protocol import *
+
 
 class MainExt(Extension):
     """

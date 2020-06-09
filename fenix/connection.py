@@ -1,11 +1,14 @@
-import websockets
-import uuid
-from fenix.core import FenixCore
-from typing import Optional
-from fenix.protocol import *
-from fenix import database
 import json
+import uuid
+from typing import Optional
+
+import websockets
+
+from fenix import database
 from fenix._protocolCore import IncompletePacket
+from fenix.core import FenixCore
+from fenix.protocol import *
+
 
 class Connection:
     def __init__(self, websocket: websockets.WebSocketServerProtocol,
@@ -64,4 +67,3 @@ class Connection:
                 await self.send(BadFormat({}))
 
             await self.core.extensions[message.extension].handle(message, self)
-            
