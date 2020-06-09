@@ -112,14 +112,29 @@ class ChannelError(BaseProtocol):
 @serverMessages.add('messageError')
 class MessageError(BaseProtocol):
     """
-    Raised when a user tries to delete or edit a nonexistant message.
+    Raised when a user tries to delete or edit a nonexistant message, or its too long.
     """
 
-@serverMessages.add('BadFormat')
+@serverMessages.add('badFormat')
 class BadFormat(BaseProtocol):
     """
     Raised when a user tries to send a message without the type field, without all the fields for the type, or with a nonexistant type.
     """
+
+
+
+@serverMessages.add('actorNotAuthorized')
+class ActorNotAuthorized(BaseProtocol):
+    pass
+
+@serverMessages.add('sentMessage')
+class SentMessage(BaseProtocol):
+    channelID: int
+    userID: int
+    content: str
+    timestamp: str
+    pinned: bool
+    messageID: int
 
 clientMessages: _protocolCore.ProtocolHelper = _protocolCore.ProtocolHelper()
 

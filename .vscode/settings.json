@@ -9,7 +9,8 @@
     "--strict",
     "--allow-subclassing-any",
     "--allow-untyped-decorators",
-    "--allow-redefinition"
+    "--allow-redefinition",
+    "--pretty"
 
   ],
   "python.testing.unittestArgs": [

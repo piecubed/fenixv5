@@ -19,7 +19,7 @@ except ImportError:
 
 import asyncpg
 from email_validator import EmailNotValidError, validate_email
-
+from emoji.unicode_codes import EMOJI_UNICODE
 
 class Dataclass:
 
@@ -123,13 +123,6 @@ class Role(Dataclass):
 
         return roles
 
-
-serverRegistrationWhiteList: Tuple[str,
-                                   ...] = ('admin', 'addChannels',
-                                           'assignRoles', 'kick', 'ban',
-                                           'changeNick', 'changeOthersNick')
-
-
 class ServerRegistration(Dataclass):
 
     _slots = ('userID', 'serverID', 'roles', 'admin', 'addChannels',
@@ -157,6 +150,18 @@ class ServerRegistration(Dataclass):
             serverRegistration.append(cls.fromDict(raw))
 
         return serverRegistration
+
+class ServerPermissionsEnum(Enum):
+    userID = 'userID'
+    serverID = 'serverID'
+    roles = 'roles'
+    admin = 'admin'
+    addChannels = 'addChannels'
+    assignRoles = 'assignRoles'
+    kick = 'kick'
+    ban = 'ban'
+    changeNick = 'changeNick'
+    changeOthersNick = 'changeOthersNick'
 
 class ChannelPermissions(Dataclass):
 
@@ -196,13 +201,14 @@ class ChannelPermissionEnum(Enum):
 class Message(Dataclass):
 
     _slots = ('userID', 'channelID', 'content', 'timestamp', 'pinned',
-              'reactions')
+              'reactions', 'messageID')
     userID: int
     channelID: int
     content: str
     timestamp: datetime.datetime
     pinned: bool
     reactions: List[int]
+    messageID: int
 
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Message':
@@ -231,6 +237,19 @@ class Channel(Dataclass):
     def fromDict(cls, source: Dict[str, Any]) -> 'Channel':
         return super().fromDict(source)  #type: ignore
 
+
+class ChannelHistory(Dataclass):
+
+    _slots = ('channelID', 'name', 'serverID', 'createdAt')
+    channelID: int
+    name: str
+    serverID: int
+    createdAt: datetime.datetime
+    messageHistory: List[Message]
+
+    @classmethod
+    def fromDict(cls, source: Dict[str, Any]) -> 'ChannelHistory':
+        return super().fromDict(source)  #type: ignore
 
 class _Database:
     def __init__(
@@ -277,8 +296,8 @@ class _SQL:
     hasServerPermission = 'SELECT $1 FROM ServerRegistration WHERE userID = $2 and serverID = $3'
     sendMessage = 'SELECT sendMessage($1, $2, $3)'
     editMessage = 'SELECT editMessage($1, $2, $3, $4)'
-    deleteMessage = 'SELECT deleteMessage($1, $2, $3, $4)'
-    addReaction = 'SELECT addReaction($1, $2, $3, $4)'
+    deleteMessage = 'SELECT deleteMessage($1)'
+    addReaction = 'SELECT addReaction($1, $2, $3)'
     pinMessage = 'SELECT pinMessage($1, $2, $3, $4)'
     removeReaction1 = '''UPDATE Messages SET ARRAY_REMOVE(reactions, $1) WHERE messageID = (SELECT messageID FROM Reactions WHERE reactionID = $1)'''
     removeReaction2 = '''DELETE Reactions WHERE reactionID = $1'''
@@ -452,7 +471,7 @@ class Database(_Database):
 
         serverID = (await self._fetch(_SQL.createServer, int(userID),
                                       name))[0]['serverid']
-        await self.createChannel(serverID=serverID, name="General")
+        await self.createChannel(serverID=serverID, name="General", userID=userID)
 
         server = await self.getServer(serverID=serverID)
 
@@ -463,18 +482,31 @@ class Database(_Database):
 
         permissions = await self._fetch(_SQL.hasChannelPermission, permission,
                                         userID, channelID)
+        try:
+            hasPermission = bool(permissions[0])
+        except IndexError:
+            hasPermission = False
 
-        return bool(permissions[0])
+        return hasPermission
 
-    async def hasServerPermission(self, *, permission: str, userID: int,
+    async def hasChannelPermissions(self, *, permissions: List[ChannelPermissionEnum], userID: int, channelID: int) -> bool:
+        for permission in permissions:
+            if not await self.hasChannelPermission(permission=permission, channelID=channelID, userID=userID):
+                return False
+        return True
+
+    async def hasServerPermission(self, *, permission: ServerPermissionsEnum, userID: int,
                                   serverID: int) -> bool:
-        if permission not in serverRegistrationWhiteList:
-            raise InvalidPermissionName
 
         permissions = await self._fetch(_SQL.hasServerPermission, permission,
                                         userID, serverID)
 
-        return bool(permissions[0])
+        try:
+            hasPermission = bool(permissions[0])
+        except IndexError:
+            hasPermission = False
+
+        return hasPermission
 
     async def changeChannelPermission(self, *, permission: ChannelPermissionEnum, value: bool,
                                       userID: int, channelID: int,
@@ -484,22 +516,22 @@ class Database(_Database):
                                         permission, value, userID, channelID,
                                         actor)
 
-        if permissions[0] is None:
+        if len(permissions) == 0:
             raise ActorNotAuthorized
 
         return ChannelPermissions.fromDict(permissions[0])
 
+
+
     async def changeServerPermission(self, *, permission: str, value: bool,
                                      userID: int, serverID: int,
                                      actor: int) -> ServerRegistration:
-        if permission not in serverRegistrationWhiteList:
-            raise InvalidPermissionName
 
         permissions = await self._fetch(_SQL.changeServerPermission,
                                         permission, value, userID, serverID,
                                         actor)
 
-        if permissions[0] is None:
+        if len(permissions) == 0:
             raise ActorNotAuthorized
 
         return ServerRegistration.fromDict(permissions[0])
@@ -508,14 +540,40 @@ class Database(_Database):
                           channelID: int) -> Message:
         if len(content) >= 1000:
             raise MessageTooLong
+        if not await self.hasChannelPermissions(channelID=channelID, permissions=[ChannelPermissionEnum.read, ChannelPermissionEnum.talk], userID=userID):
+            raise ActorNotAuthorized
+
         message = await self._fetch(_SQL.sendMessage, channelID, userID,
                                     content)
+
         return Message.fromDict(message[0])
+
+    async def getChannel(self, *, channelID: int, userID: int) -> ChannelHistory:
+        canReadHistory = await self.hasChannelPermission(permission=ChannelPermissionEnum.readHistory, userID=userID, channelID=channelID)
+        if not canReadHistory:
+            raise ActorNotAuthorized()
+
+        rawChannel = await self._fetch('SELECT * FROM Channels WHERE channelID = $1', channelID)
+
+        if len(rawChannel) == 0:
+            raise NoSuchChannel()
+        rawChannel = dict(rawChannel[0])
+
+
+        history: List[Message] = []
+
+        for message in await self._fetch('SELECT * FROM Messages WHERE channelID = $1 LIMIT 50 ORDER BY stamp DESC'):
+            history.append(Message.fromDict(message))
+
+        rawChannel['history'] = history
+        channel = ChannelHistory.fromDict(rawChannel)
+
+        return channel
 
     async def editMessage(self, *, messageID: int, userID: int,
                           content: str) -> Message:
         if len(content) >= 1000:
-            raise MessageTooLong
+            raise MessageTooLong()
 
         message = await self._fetch(_SQL.editMessage, content, messageID,
                                     userID)
@@ -523,32 +581,161 @@ class Database(_Database):
 
     async def deleteMessage(self, *, messageID: int, userID: int,
                             channelID: int, actor: int) -> None:
-        await self._execute(_SQL.deleteMessage, messageID, userID, channelID,
-                            actor)
+        """Deletes a message
+
+        Args:
+            messageID (int):
+            userID (int):
+            channelID (int):
+            actor (int):
+
+        Raises:
+            ActorNotAuthorized:
+        """
+
+        if not await self.isInServer(userID=actor, serverID=(await self.serverIDFromChannelID(channelID=channelID))):
+            raise ActorNotAuthorized()
+
+        if not (actor == userID or await self.hasChannelPermission(permission=ChannelPermissionEnum.deleteMessages, userID = actor, channelID = channelID)):
+            raise ActorNotAuthorized()
+
+        await self._execute(_SQL.deleteMessage, messageID)
+
+    async def isInServer(self, *, userID: int, serverID: int) -> bool:
+        """Checks to see if a user is in a server
+
+        Args:
+            userID (int):
+            serverID (int):
+
+        Returns:
+            bool:
+        """
+        userID = await self._fetch('SELECT userID FROM ServerRegistration WHERE userID = $1 AND serverID = $2', userID, serverID)
+
+        return len(userID) == 1
+
+    async def serverIDFromChannelID(self, *, channelID: int) -> int:
+        return int((await self._fetch('SELECT serverID FROM channels WHERE channelID = $1', channelID))[0]['serverID'])
 
     async def addReaction(self, *, messageID: int, userID: int, channelID: int,
-                          unicode: str) -> Message:
-        message = await self._fetch(_SQL.addReaction, messageID, userID,
-                                    channelID, unicode)
+                          unicode: str) -> Reaction:
+        """Adds a reaction to the database\n
 
-        return Message.fromDict(message[0])
+        Args:\n
+            messageID (int):\n
+            userID (int):\n
+            channelID (int):\n
+            unicode (str):\n
 
-    async def removeReaction(self, *, reactionID: int) -> None:
-        await self._execute(_SQL.removeReaction1, reactionID)
-        await self._execute(_SQL.removeReaction2, reactionID)
+        Raises:\n
+            InvalidUnicode: The unicode argument is not a supported unicode alias.\n
+            NoSuchMessage: messageID does not exist.\n
+            ActorNotAuthorized: userID is not allowed to add reactions in this channel.\n
+            NoSuchChannel: channelID does not exist.\n
+        Returns:\n
+            Reaction: Modified message object.\n
+        """
+        if unicode not in EMOJI_UNICODE.keys():
+            raise InvalidUnicode()
 
-    async def createChannel(self, *, serverID: int, name: str) -> Channel:
-        channel = await self._fetch(_SQL.createChannel, name, serverID)
-        return Channel.fromDict(channel[0])
+        if len(await self._fetch('SELECT messageID FROM messages WHERE messageID = $1', messageID)) == 0:
+            raise NoSuchMessage()
+
+        if len(await self._fetch('SELECT channelID FROM Channels WHERE channelID = $1', channelID)) == 0:
+            raise NoSuchChannel()
+
+        if await self.hasChannelPermission(permission=ChannelPermissionEnum.addReactions, channelID=channelID, userID=userID):
+            reaction = await self._fetch(_SQL.addReaction, messageID, userID,
+                                        unicode)
+
+            return Reaction.fromDict(reaction)
+        else:
+            raise ActorNotAuthorized()
+
+    async def removeReaction(self, *, reactionID: int, userID: int, channelID: int) -> None:
+        """Removes a reaction from the database\n
+
+        Args:\n
+            reactionID (int):\n
+            userID (int):\n
+            channelID (int):\n
+
+        Raises:\n
+            NoSuchReaction: reactionID is not valid.\n
+            ActorNotAuthorized: Either the actor does not have the DeleteMessages permission, the user is no longer in the server, or the user does not own the message.\n
+            NoSuchMessage: This should honestly never happen\n
+        """
+        try:
+            reaction = Reaction.fromDict((await self._fetch('SELECT * FROM Reactions WHERE reactionID = $1', reactionID))[0])
+        except IndexError:
+            raise NoSuchReaction()
+        try:
+            #message = Message.fromDict((await self._fetch('SELECT * FROM Messages WHERE messageID = $1', reaction.))[0])
+            raise NotImplementedError
+        except IndexError:
+            raise NoSuchMessage()
+        if userID in reaction.users or await self.hasChannelPermission(permission=ChannelPermissionEnum.deleteMessages, channelID=channelID, userID=userID):
+            await self._execute(_SQL.removeReaction1, reactionID)
+            await self._execute(_SQL.removeReaction2, reactionID)
+        else:
+            raise ActorNotAuthorized()
+
+    async def createChannel(self, *, serverID: int, name: str, userID: int) -> Channel:
+        """Creates a new channel.
+
+        Args:
+            serverID (int):
+            name (str):
+            userID (int):
+
+        Raises:
+            ActorNotAuthorized: The actor does not have the addChannels permission.
+
+        Returns:
+            Channel: The newly created channel object.
+        """
+
+        if await self.hasServerPermission(permission=ServerPermissionsEnum.addChannels, userID = userID, serverID=serverID):
+            channel = await self._fetch(_SQL.createChannel, name, serverID)
+            return Channel.fromDict(channel[0])
+        else:
+            raise ActorNotAuthorized()
 
     async def changeSubscribedChannel(self, *, channelID: int, userID: int,
                                       sessionID: str) -> None:
+        """Changes the channel a user is subscribed to in a session.
+
+        Args:
+            channelID (int):
+            userID (int):
+            sessionID (str):
+
+        Raises:
+            ActorNotAuthorized: The actor does not have the read permission.
+
+        Returns:
+            None:
+        """
         if await self.hasChannelPermission(permission=ChannelPermissionEnum.read, userID=userID, channelID=channelID):
             return await self._execute(
                 'UPDATE FocusedChannels SET channelID = $1 WHERE userID = $2 and sessionID = $3',
                 channelID, userID, sessionID)
         raise ActorNotAuthorized()
 
+    async def getAllSessionsSubscribedToChannel(self, *, channelID: int): # type: ignore
+        sessions = await self._fetch('SELECT sessionID FROM FocusedChannels WHERE channelID = $1', channelID)
+        for sessionID in sessions:
+            yield sessionID[0]
+
+class NoSuchMessage(Exception):
+
+    pass
+class NoSuchReaction(Exception):
+    pass
+
+class InvalidUnicode(Exception):
+    pass
 
 class CannotTalk(Exception):
     pass
@@ -566,10 +753,6 @@ class ActorNotAuthorized(Exception):
     pass
 
 
-class InvalidPermissionName(Exception):
-    pass
-
-
 class UserNotFound(Exception):
     pass
 
@@ -579,4 +762,7 @@ class InvalidCredentials(Exception):
 
 
 class UserExists(Exception):
+    pass
+
+class NoSuchChannel(Exception):
     pass

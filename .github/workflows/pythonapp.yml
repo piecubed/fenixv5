@@ -29,7 +29,7 @@ jobs:
     - name: Lint with mypy
       run: |
         pip install mypy
-        mypy fenix/ --strict --allow-redefinition --show-column-numbers --pretty --ignore-missing-imports --allow-subclassing-any --allow-untyped-decorators
+        mypy fenix/ --strict --follow-imports=silent --allow-redefinition --show-column-numbers --pretty --ignore-missing-imports --allow-subclassing-any --allow-untyped-decorators
 
     - name: Setup PostgreSQL
       uses: Harmon758/postgresql-action@v1.0.0
@@ -43,6 +43,5 @@ jobs:
         postgresql password: test
     - name: Test with pytest
       run: |
-        pip install pytest
         tests=(tests/*test.py)
         pipenv run python -m unittest $tests

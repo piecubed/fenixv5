@@ -9,9 +9,12 @@ mypy = "*"
 sphinx = "*"
 sphinx-glpi-theme = "*"
 
+
 [packages]
 websockets = "*"
 asyncpg = "*"
 email_validator = "*"
 protobuf = "*"
 aiohttp = "*"
+emoji = "*"
+boxtest = "*"

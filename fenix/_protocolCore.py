@@ -78,6 +78,7 @@ class BaseMessage(metaclass=_AutoSlotsMeta):
 
     __annotations: Dict[str, Any]
     extension: str
+    id: int
 
     def __init__(self, data: Dict[Any, Any]) -> None:
         assert isinstance(data, dict)
@@ -92,6 +93,7 @@ class BaseMessage(metaclass=_AutoSlotsMeta):
             if not _isinstance(value, attr_type):
                 raise TypeError(f'Expected {attr_type!r}, got {value!r}')
             setattr(self, attr, value)
+
         self._raw = data
 
     def __iter__(self) -> Iterator[Any]:

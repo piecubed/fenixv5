@@ -45,8 +45,7 @@ CREATE TABLE Messages(
     userID INT NOT NULL,
     contents TEXT NOT NULL,
     stamp TIMESTAMP NOT NULL,
-    pinned BOOLEAN NOT NULL DEFAULT FALSE,
-    reactions TEXT[] NOT NULL DEFAULT '{}'
+    pinned BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 DROP TABLE IF EXISTS Reactions;
@@ -105,24 +104,21 @@ CREATE TABLE Bots(
 );
 
 DROP FUNCTION IF EXISTS addReaction;
-CREATE FUNCTION addReaction(mID integer, uID integer, cID integer, unicode text) RETURNS integer AS $$
+CREATE FUNCTION addReaction(mID integer, uID integer. emoji text) RETURNS Table(
+    reactionID INT NOT NULL,
+    unicode TEXT NOT NULL,
+    messageID INT NOT NULL,
+    users INT[] NOT NULL
+) AS $$
 DECLARE
     reactionID integer;
 BEGIN
-    SELECT canTalk, canAddReactions FROM ChannelPermissions WHERE channelID = cID AND userID = uID;
-    IF (canAddReactions AND canTalk) THEN
-        IF ARRAY_LENGTH(
-                (SELECT reactions FROM Messages WHERE messageID = mID)) = 0 THEN -- If there are no reactions, add a reaction row for this message.
+    SELECT reactionID FROM Reactions WHERE messageID = mID AND unicode = emoji;
 
-
-            INSERT INTO Reactions(unicode, messageID, users) VALUES (unicode, mID, (uID)) RETURNING reactionID INTO reactionID;
-
-            UPDATE Messages SET
-                    reactions = (reactionID)
-                WHERE messageID = mID AND userID = uID;
-
-            RETURN reactionID;
-        END IF;
+    IF reactionID = null THEN -- If there are no reactions, add a reaction row for this message.
+        INSERT INTO Reactions(unicode, messageID, users) VALUES (emoji, mID, (uID)) RETURNING *;
+    ELSE THEN
+        UPDATE Reactions SET users = array_append(uID) WHERE messageID = mID AND unicode = emoji;
     END IF;
 END; $$
 LANGUAGE PLPGSQL;
@@ -206,15 +202,9 @@ END; $$
 LANGUAGE PLPGSQL;
 
 DROP FUNCTION IF EXISTS deleteMessage;
-CREATE FUNCTION deleteMessage(mID integer, uID integer, cID integer, actor integer) RETURNS void AS $$
+CREATE FUNCTION deleteMessage(mID integer) RETURNS void AS $$
 BEGIN
-    SELECT canDeleteMessages FROM ChannelPermissions WHERE channelID = cID AND userID = actor;
-
-    IF (canDeleteMessages OR uID = actor) THEN
-        DELETE FROM Messages WHERE messageID = mID;
-    ELSE
-        RAISE EXCEPTION 'No deletemessage perm';
-    END IF;
+    DELETE FROM Messages WHERE messageID = mID;
 END; $$
 LANGUAGE PLPGSQL;
 
