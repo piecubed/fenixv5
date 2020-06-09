@@ -1,4 +1,5 @@
 # Fenix
+![Test](https://github.com/piecubed/fenix/workflows/Test/badge.svg)
 Fenix is a communication standard, designed for ease of use, and an excellent user expierience.
 
 ----------
