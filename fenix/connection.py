@@ -35,8 +35,9 @@ class Connection:
         try:
             focusedChannel = int(self.ws.request_headers['focusedChannel'])
         except (ValueError, KeyError):
-            return await self.ws.close(
+            await self.ws.close(
                 code=1008, reason='No focusedChannel header present!')
+            return None
 
         # Add our sessionID
         await self.core.database.createSession(

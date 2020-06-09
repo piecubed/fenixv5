@@ -50,14 +50,16 @@ class FenixCore:
             user = await self.database.fetchUserByToken(token=token)
         else:
             print(path, 'got through the filter.')
-            return await websocket.close(
+            await websocket.close(
                 code=1008, reason='https://www.xeroxirc.net/logs/#fenix?yyyy=2020&mm=04&dd=26&uhh=17&umm=53&sid=8&eid=26')
+            return None
 
         try:
             focusedChannel = int(websocket.request_headers['focusedChannel'])
         except (ValueError, KeyError):
-            return await websocket.close(
+            await websocket.close(
                 code=1008, reason='No focusedChannel header present!')
+            return None
         conn = Connection(websocket, user, self)
 
         # Add our sessionID
