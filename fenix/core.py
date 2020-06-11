@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import abc
 import asyncio
 import datetime
@@ -14,23 +16,22 @@ from websockets.http import Headers
 
 import fenix.database as database
 from fenix._protocolCore import IncompletePacket
-from fenix.connection import Connection
-from fenix.extension import Extension
-from fenix.extensions.main import MainExt
 from fenix.protocol import *
 from fenix.recaptcha import RECaptcha
-
+import fenix.connection as connection
+import fenix.extensions.main as main
+import fenix.extension as extension
 
 class FenixCore:
-    def __init__(self, extensions: Dict[str, Extension]) -> None:
-        self.extensions.update(extensions)
+    def __init__(self, extensions: Dict[str, extension.Extension]) -> None:
+        for extensionName, extensionClass in extensions:
+            self.extensions[extensionName] = extensionClass(self) #type: ignore
+        self.extensions[None] = main.MainExt(self) #type: ignore
 
     database = database.Database()
     recaptcha = RECaptcha()
-    sessions: Dict[str, Connection] = {}
-    extensions: Dict[str, Extension] = {
-        None: MainExt() #type: ignore
-    }
+    sessions: Dict[str, connection.Connection] = {}
+    extensions: Dict[str, extension.Extension] = {}
 
     serverMessages = serverMessages
     clientMessages = clientMessages
@@ -51,24 +52,22 @@ class FenixCore:
         else:
             print(path, 'got through the filter.')
             await websocket.close(
-                code=1008, reason='https://www.xeroxirc.net/logs/#fenix?yyyy=2020&mm=04&dd=26&uhh=17&umm=53&sid=8&eid=26')
+                code=1008,
+                reason=
+                'https://www.xeroxirc.net/logs/#fenix?yyyy=2020&mm=04&dd=26&uhh=17&umm=53&sid=8&eid=26'
+            )
             return None
 
         try:
             focusedChannel = int(websocket.request_headers['focusedChannel'])
         except (ValueError, KeyError):
-            await websocket.close(
-                code=1008, reason='No focusedChannel header present!')
+            await websocket.close(code=1008,
+                                  reason='No focusedChannel header present!')
             return None
-        conn = Connection(websocket, user, self)
+        conn = connection.Connection(websocket, user, self)
 
-        # Add our sessionID
-        await self.database.createSession(
-                                               userID=user.userID,
-                                               sessionID=conn.sessionID
-                                              )
         self.sessions[conn.sessionID] = conn
-        conn.main()
+        await conn.main()
 
     async def handleHTTP(  #type: ignore
         self, path: str, request_headers: Headers
@@ -154,7 +153,9 @@ class FenixCore:
             #     headers['error'] = 'Invalid response token.'
             #     return (status, headers, b'')
             try:
-                await self.database.signUp(username=username, password=password, email=email)
+                await self.database.signUp(username=username,
+                                           password=password,
+                                           email=email)
             except database.UserExists:
                 status = HTTPStatus.FORBIDDEN
                 headers = Headers()
@@ -165,7 +166,12 @@ class FenixCore:
             return (status, Headers(), b'')
 
     async def connect(self) -> None:
-        await websockets.serve(ws_handler=self.handleWebsocket, host='', )
+        print('Hosting websocket on ws://bloblet.com:43618/')
+        await websockets.serve(
+            ws_handler=self.handleWebsocket,
+            host='',
+            port=43618
+        )
 
     def run(self) -> None:
         loop = asyncio.get_event_loop()

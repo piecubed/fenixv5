@@ -10,7 +10,7 @@ CREATE TABLE Users(
     token TEXT NOT NULL UNIQUE,
     usernameHash SERIAL UNIQUE,
     createdAt TIMESTAMP NOT NULL,
-    verified BOOLEAN NOT NULL,
+    verified BOOLEAN NOT NULL
 );
 
 DROP TABLE IF EXISTS Channels;
@@ -21,9 +21,10 @@ CREATE TABLE Channels(
     createdAt TIMESTAMP NOT NULL
 );
 
-DROP TABLE IF EXISTS FocusedChannels;
-CREATE TABLE FocusedChannels (
+DROP TABLE IF EXISTS FocusedItems;
+CREATE TABLE FocusedItems (
     sessionID TEXT PRIMARY KEY,
+    serverID INT,
     channelID INT,
     userID INT
 );
@@ -86,11 +87,11 @@ CREATE TABLE ChannelPermissions(
     canTalk BOOLEAN NOT NULL DEFAULT TRUE,
     canReadHistory BOOLEAN NOT NULL DEFAULT TRUE,
     canDeleteMessages BOOLEAN NOT NULL DEFAULT FALSE,
-    canAddReactions BOOLEAN NOT NULL DEFAULT FALSE,
+    canAddReactions BOOLEAN NOT NULL DEFAULT TRUE,
     canManageChannel BOOLEAN NOT NULL DEFAULT FALSE,
     canManagePermissions BOOLEAN NOT NULL DEFAULT FALSE,
     canPinMessages BOOLEAN NOT NULL DEFAULT FALSE,
-    canMentionEveryone BOOLEAN NOT NULL DEFAULT FALSE
+    canMentionEveryone BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 DROP TABLE IF EXISTS Bots;
@@ -104,11 +105,11 @@ CREATE TABLE Bots(
 );
 
 DROP FUNCTION IF EXISTS addReaction;
-CREATE FUNCTION addReaction(mID integer, uID integer. emoji text) RETURNS Table(
-    reactionID INT NOT NULL,
-    unicode TEXT NOT NULL,
-    messageID INT NOT NULL,
-    users INT[] NOT NULL
+CREATE FUNCTION addReaction(mID integer, uID integer, emoji text) RETURNS Table(
+    reactionID INT,
+    unicode TEXT,
+    messageID INT,
+    users INT[]
 ) AS $$
 DECLARE
     reactionID integer;
@@ -117,7 +118,7 @@ BEGIN
 
     IF reactionID = null THEN -- If there are no reactions, add a reaction row for this message.
         INSERT INTO Reactions(unicode, messageID, users) VALUES (emoji, mID, (uID)) RETURNING *;
-    ELSE THEN
+    ELSE
         UPDATE Reactions SET users = array_append(uID) WHERE messageID = mID AND unicode = emoji;
     END IF;
 END; $$
@@ -141,40 +142,19 @@ END; $$
 LANGUAGE PLPGSQL;
 
 DROP FUNCTION IF EXISTS sendMessage;
-CREATE FUNCTION sendMessage(cID integer, uID integer, content text) RETURNS Table(
+CREATE FUNCTION sendMessage(cID integer, uID integer, cont text) RETURNS Table(
     messageID INT,
     channelID INT,
     userID INT,
     contents TEXT,
     stamp TIMESTAMP,
-    pinned BOOLEAN,
-    reactions TEXT[]
+    pinned BOOLEAN
 ) AS $$
+DECLARE
+    serverID integer;
 BEGIN
-
     IF (SELECT canTalk FROM ChannelPermissions WHERE ChannelPermissions.channelID = cID AND ChannelPermissions.userID = uID) THEN
-        RETURN QUERY INSERT INTO Messages (cID, userID, content, stamp) VALUES (cID, uID, content, CURRENT_TIMESTAMP) RETURNING *;
-    ELSE
-        RAISE EXCEPTION 'No canTalk perm';
-    END IF;
-END; $$
-LANGUAGE PLPGSQL;
-
-DROP FUNCTION IF EXISTS joinServer;
-CREATE FUNCTION joinServer(sID integer, uID integer) RETURNS Table(
-    messageID INT,
-    channelID INT,
-    userID INT,
-    contents TEXT,
-    stamp TIMESTAMP,
-    pinned BOOLEAN,
-    reactions TEXT[]
-) AS $$
-BEGIN
-
-    INSERT INTO ChannelPermissions (userID, channelID) VALUES ();
-    IF (SELECT canTalk FROM ChannelPermissions WHERE ChannelPermissions.channelID = cID AND ChannelPermissions.userID = uID) THEN
-        RETURN QUERY INSERT INTO Messages (cID, userID, content, stamp) VALUES (cID, uID, content, CURRENT_TIMESTAMP) RETURNING *;
+        RETURN QUERY INSERT INTO Messages (channelID, userID, contents, stamp) VALUES (cID, uID, cont, CURRENT_TIMESTAMP) RETURNING *;
     ELSE
         RAISE EXCEPTION 'No canTalk perm';
     END IF;

@@ -24,12 +24,12 @@ serverMessages: _protocolCore.ProtocolHelper = _protocolCore.ProtocolHelper()
 class AuthUser(BaseProtocol):
     username: str
     email: str
-    settings: Dict[str, Any]
+    settings: Optional[Dict[str, Any]]
     token: str
     usernameHash: int
-    createdAt: datetime.datetime
+    createdAt: int
     verified: bool
-    servers: Dict[str, Dict[str, str]]
+    servers: List[Dict[str, Any]]
 
 @serverMessages.add('reactionAdded')
 class ReactionAdded(BaseProtocol):

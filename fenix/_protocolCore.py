@@ -77,24 +77,32 @@ class BaseMessage(metaclass=_AutoSlotsMeta):
 	"""
 
     __annotations: Dict[str, Any]
-    extension: str
-    id: int
+    id: Optional[int]
+    _raw: Dict[str, Any]
 
     def __init__(self, data: Dict[Any, Any]) -> None:
+        self.extension: str
+        actualData: Dict[str, Any] = {}
         assert isinstance(data, dict)
         for attr, attr_type in self.__annotations.items():
+            if attr not in data and _isinstance(attr_type, Optional[Any]):
+                continue
+
             if attr not in data:
                 if not hasattr(self, attr):
+                    print(data)
                     raise IncompletePacket(attr)
+                actualData[attr] = copy.deepcopy(getattr(self, attr))
                 setattr(self, attr, copy.deepcopy(getattr(self, attr)))
                 continue
 
             value = data[attr]
             if not _isinstance(value, attr_type):
-                raise TypeError(f'Expected {attr_type!r}, got {value!r}')
+                raise TypeError(f'Expected {attr_type!r}, got {value!r} for {attr}')
+            actualData[attr] = value
             setattr(self, attr, value)
 
-        self._raw = data
+        self._raw = actualData
 
     def __iter__(self) -> Iterator[Any]:
         for attr in self.__class__.__annotations:

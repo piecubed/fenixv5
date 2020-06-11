@@ -1,17 +1,17 @@
-from fenix import database
-from fenix.connection import Connection
-from fenix.core import FenixCore
+from __future__ import annotations
+
 from fenix.extension import Extension
+from fenix.connection import Connection
+import fenix.database as database
 from fenix.protocol import *
-
-
+import fenix.core as core
 class MainExt(Extension):
     """
     Main extension that defines server interaction, message sending, and channel interaction.
     """
 
-    def __init__(self, core: FenixCore) -> None:
-        self.core: FenixCore = core
+    def __init__(self, core: core.FenixCore) -> None:
+        self.core = core
         self.database: database.Database = self.core.database
 
     async def changeSubscribedChannel(self, message: ChangeSubscribedChannel,

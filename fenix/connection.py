@@ -1,24 +1,24 @@
-import json
+from __future__ import annotations
+import websockets
+import fenix.core
+from fenix.protocol import *
+import fenix.database
 import uuid
 from typing import Optional
-
-import websockets
-
-from fenix import database
 from fenix._protocolCore import IncompletePacket
-from fenix.core import FenixCore
-from fenix.protocol import *
-
+import json
 
 class Connection:
     def __init__(self, websocket: websockets.WebSocketServerProtocol,
-                 user: database.User, core: FenixCore) -> None:
+                 user: fenix.database.User, core: fenix.core.FenixCore) -> None:
         self.ws = websocket
         self.user = user
         self.core = core
         self.sessionID: str = str(uuid.uuid4())
 
-    async def send(self, payload: BaseProtocol, original: Optional[BaseProtocol] = None) -> None:
+    async def send(self,
+                   payload: BaseProtocol,
+                   original: Optional[BaseProtocol] = None) -> None:
         if original is None:
             try:
                 await self.ws.send(payload.dumps())
@@ -35,15 +35,13 @@ class Connection:
         try:
             focusedChannel = int(self.ws.request_headers['focusedChannel'])
         except (ValueError, KeyError):
-            await self.ws.close(
-                code=1008, reason='No focusedChannel header present!')
+            await self.ws.close(code=1008,
+                                reason='No focusedChannel header present!')
             return None
 
         # Add our sessionID
-        await self.core.database.createSession(
-                                               userID=self.user.userID,
-                                               sessionID=self.sessionID
-                                              )
+        await self.core.database.createSession(userID=self.user.userID,
+                                               sessionID=self.sessionID)
 
         # Our user should always be authenticated, so Fenix sends the fully authorized user.
         # Flow of authenticatsion would be something like this:
@@ -55,10 +53,11 @@ class Connection:
         # transformed into a websocket normally.
         # Fenix then gets the user object from the lingering HTTP headers accessible from the websocket object and sends a AuthUser
         # message to the client as the first message, and then starts listening.
-        await self.send(AuthUser(self.user._raw), original=BaseProtocol({'id': 0}))
+        await self.send(AuthUser(self.user._raw))
         if focusedChannel != 0:
-            channel: database.ChannelHistory = await self.core.database.getChannel(channelID=focusedChannel, userID=self.user.userID)
-            await self.send(ChannelInfo(channel._raw), original=BaseProtocol({'id': 1}))
+            channel: fenix.database.ChannelHistory = await self.core.database.getChannel(
+                channelID=focusedChannel, userID=self.user.userID)
+            await self.send(ChannelInfo(channel._raw))
 
         async for raw in self.ws:
             message: BaseProtocol
