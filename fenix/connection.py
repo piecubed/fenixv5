@@ -5,7 +5,7 @@ from fenix.protocol import *
 import fenix.database
 import uuid
 from typing import Optional
-from fenix._protocolCore import IncompletePacket
+from fenix._protocolCore import IncompletePacket, BaseMessage
 import json
 
 class Connection:
@@ -14,11 +14,11 @@ class Connection:
         self.ws = websocket
         self.user = user
         self.core = core
-        self.sessionID: str = str(uuid.uuid4())
+        self.sessionID: uuid.UUID = uuid.uuid4()
 
     async def send(self,
-                   payload: BaseProtocol,
-                   original: Optional[BaseProtocol] = None) -> None:
+                   payload: BaseMessage,
+                   original: Optional[BaseMessage] = None) -> None:
         if original is None:
             try:
                 await self.ws.send(payload.dumps())
@@ -33,11 +33,13 @@ class Connection:
 
     async def main(self) -> None:
         try:
-            focusedChannel = int(self.ws.request_headers['focusedChannel'])
-        except (ValueError, KeyError):
+            focusedChannel = uuid.UUID(self.ws.request_headers['focusedChannel'])
+        except KeyError:
             await self.ws.close(code=1008,
                                 reason='No focusedChannel header present!')
             return None
+        except ValueError:
+            focusedChannel = uuid.UUID(int=0)
 
         # Add our sessionID
         await self.core.database.createSession(userID=self.user.userID,
@@ -60,7 +62,7 @@ class Connection:
             await self.send(ChannelInfo(channel._raw))
 
         async for raw in self.ws:
-            message: BaseProtocol
+            message: BaseMessage
             try:
                 messsage = clientMessages.get(json.loads(raw))
             except (TypeError, IncompletePacket, json.JSONDecodeError):

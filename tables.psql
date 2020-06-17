@@ -1,7 +1,7 @@
 DROP TABLE IF EXISTS Users;
 
 CREATE TABLE Users(
-    userID SERIAL PRIMARY KEY,
+    userID uuid PRIMARY KEY,
     username TEXT NOT NULL,
     password BYTEA NOT NULL,
     email TEXT NOT NULL UNIQUE,
@@ -15,7 +15,7 @@ CREATE TABLE Users(
 
 DROP TABLE IF EXISTS Channels;
 CREATE TABLE Channels(
-    channelID SERIAL PRIMARY KEY,
+    channelID uuid PRIMARY KEY,
     name TEXT NOT NULL,
     serverID INT NOT NULL,
     createdAt TIMESTAMP NOT NULL
@@ -23,7 +23,7 @@ CREATE TABLE Channels(
 
 DROP TABLE IF EXISTS FocusedItems;
 CREATE TABLE FocusedItems (
-    sessionID TEXT PRIMARY KEY,
+    sessionID uuid PRIMARY KEY,
     serverID INT,
     channelID INT,
     userID INT
@@ -31,7 +31,7 @@ CREATE TABLE FocusedItems (
 
 DROP TABLE IF EXISTS Servers;
 CREATE TABLE Servers(
-    serverID SERIAL PRIMARY KEY,
+    serverID uuid PRIMARY KEY,
     ownerID INT NOT NULL,
     createdAt TIMESTAMP NOT NULL,
     name TEXT NOT NULL,
@@ -41,7 +41,7 @@ CREATE TABLE Servers(
 
 DROP TABLE IF EXISTS Messages;
 CREATE TABLE Messages(
-    messageID SERIAL PRIMARY KEY,
+    messageID uuid PRIMARY KEY,
     channelID INT NOT NULL,
     userID INT NOT NULL,
     contents TEXT NOT NULL,
@@ -51,7 +51,7 @@ CREATE TABLE Messages(
 
 DROP TABLE IF EXISTS Reactions;
 CREATE TABLE Reactions(
-    reactionID SERIAL PRIMARY KEY,
+    reactionID uuid PRIMARY KEY,
     unicode TEXT NOT NULL,
     messageID INT NOT NULL,
     users INT[] NOT NULL
@@ -73,16 +73,16 @@ CREATE TABLE ServerRegistration(
 
 DROP TABLE IF EXISTS Roles;
 CREATE TABLE Roles(
-    roleID SERIAL PRIMARY KEY,
-    serverID TEXT NOT NULL,
+    roleID uuid PRIMARY KEY,
+    serverID uuid NOT NULL,
     name TEXT NOT NULL,
     color TEXT NOT NULL
 );
 
 DROP TABLE IF EXISTS ChannelPermissions;
 CREATE TABLE ChannelPermissions(
-    userID INT NOT NULL,
-    channelID INT NOT NULL,
+    userID uuid NOT NULL,
+    channelID uuid NOT NULL,
     canRead BOOLEAN NOT NULL DEFAULT TRUE,
     canTalk BOOLEAN NOT NULL DEFAULT TRUE,
     canReadHistory BOOLEAN NOT NULL DEFAULT TRUE,
@@ -96,8 +96,8 @@ CREATE TABLE ChannelPermissions(
 
 DROP TABLE IF EXISTS Bots;
 CREATE TABLE Bots(
-    botID SERIAL PRIMARY KEY,
-    ownerID TEXT NOT NULL,
+    botID uuid PRIMARY KEY,
+    ownerID uuid NOT NULL,
     createdAt TIMESTAMP NOT NULL,
     username TEXT NOT NULL UNIQUE,
     token TEXT NOT NULL UNIQUE,
@@ -105,14 +105,14 @@ CREATE TABLE Bots(
 );
 
 DROP FUNCTION IF EXISTS addReaction;
-CREATE FUNCTION addReaction(mID integer, uID integer, emoji text) RETURNS Table(
+CREATE FUNCTION addReaction(mID uuid, uID uuid, emoji text) RETURNS Table(
     reactionID INT,
     unicode TEXT,
     messageID INT,
     users INT[]
 ) AS $$
 DECLARE
-    reactionID integer;
+    reactionID uuid;
 BEGIN
     SELECT reactionID FROM Reactions WHERE messageID = mID AND unicode = emoji;
 
@@ -125,9 +125,9 @@ END; $$
 LANGUAGE PLPGSQL;
 
 DROP FUNCTION IF EXISTS createRole;
-CREATE FUNCTION createRole(roleName text, colorRGB text, sID integer, actor integer) RETURNS Table(
-    roleID INT,
-    serverID TEXT,
+CREATE FUNCTION createRole(roleName text, colorRGB text, sID uuid, actor TEXT) RETURNS Table(
+    roleID uuid,
+    serverID uuid,
     name TEXT,
     color TEXT
 ) AS $$
@@ -142,16 +142,16 @@ END; $$
 LANGUAGE PLPGSQL;
 
 DROP FUNCTION IF EXISTS sendMessage;
-CREATE FUNCTION sendMessage(cID integer, uID integer, cont text) RETURNS Table(
-    messageID INT,
-    channelID INT,
-    userID INT,
+CREATE FUNCTION sendMessage(cID uuid, uID uuid, cont text) RETURNS Table(
+    messageID uuid,
+    channelID uuid,
+    userID uuid,
     contents TEXT,
     stamp TIMESTAMP,
     pinned BOOLEAN
 ) AS $$
 DECLARE
-    serverID integer;
+    serverID uuid;
 BEGIN
     IF (SELECT canTalk FROM ChannelPermissions WHERE ChannelPermissions.channelID = cID AND ChannelPermissions.userID = uID) THEN
         RETURN QUERY INSERT INTO Messages (channelID, userID, contents, stamp) VALUES (cID, uID, cont, CURRENT_TIMESTAMP) RETURNING *;
@@ -162,10 +162,10 @@ END; $$
 LANGUAGE PLPGSQL;
 
 DROP FUNCTION IF EXISTS editMessage;
-CREATE FUNCTION editMessage(content text, mID integer, uID integer, cID integer) RETURNS Table(
-    messageID INT,
-    channelID INT,
-    userID INT,
+CREATE FUNCTION editMessage(content text, mID uuid, uID uuid, cID uuid) RETURNS Table(
+    messageID uuid,
+    channelID uuid,
+    userID uuid,
     contents TEXT,
     stamp TIMESTAMP,
     pinned BOOLEAN,
@@ -182,17 +182,17 @@ END; $$
 LANGUAGE PLPGSQL;
 
 DROP FUNCTION IF EXISTS deleteMessage;
-CREATE FUNCTION deleteMessage(mID integer) RETURNS void AS $$
+CREATE FUNCTION deleteMessage(mID uuid) RETURNS void AS $$
 BEGIN
     DELETE FROM Messages WHERE messageID = mID;
 END; $$
 LANGUAGE PLPGSQL;
 
 DROP FUNCTION IF EXISTS pinMessage;
-CREATE FUNCTION pinMessage(mID integer, cID integer, actor integer, toPin boolean) RETURNS Table(
-    messageID INT,
-    channelID INT,
-    userID INT,
+CREATE FUNCTION pinMessage(mID uuid, cID uuid, actor text, toPin boolean) RETURNS Table(
+    messageID uuid,
+    channelID uuid,
+    userID uuid,
     contents TEXT,
     stamp TIMESTAMP,
     pinned BOOLEAN,

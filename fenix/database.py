@@ -15,14 +15,14 @@ from typing import Any, Dict, Iterator, List, Tuple, Optional
 import asyncpg
 from email_validator import EmailNotValidError, validate_email
 from emoji.unicode_codes import EMOJI_UNICODE
+import uuid
+import time
 
 try:
     import fenix.conf as conf
     password = conf.databasePassword
 except ImportError:
     password = None
-
-print(password)
 
 class Dataclass:
 
@@ -45,7 +45,7 @@ class User(Dataclass):
     _slots = ('userID', 'username', 'password', 'email', 'salt', 'settings',
               'token', 'usernameHash', 'createdAt', 'verified', 'servers')
 
-    userID: int
+    userID: uuid.UUID
     username: str
     password: bytes
     email: str
@@ -55,14 +55,14 @@ class User(Dataclass):
     usernameHash: str
     createdAt: datetime.datetime
     verified: bool
-    focusedChannel: int
+    focusedChannel: uuid.UUID
     servers: Optional[List['Server']]
 
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'User':
         source = dict(source)
         if source.get('servers') is None:
-            source['servers'] = {}
+            source['servers'] = []
 
         return super().fromDict(source)  #type: ignore
 
@@ -76,7 +76,7 @@ class AuthUtils:
 class Server(Dataclass):
     _slots = ('serverID', 'name', 'createdAt')
 
-    serverID: int
+    serverID: uuid.UUID
     name: str
     createdAt: datetime.datetime
     # icon: str
@@ -95,8 +95,8 @@ class Server(Dataclass):
 
     @classmethod
     def fromListToDict(cls, source: List[Dict[str,
-                                              Any]]) -> Dict[int, 'Server']:
-        servers: Dict[int, 'Server'] = {}
+                                              Any]]) -> Dict[uuid.UUID, 'Server']:
+        servers: Dict[uuid.UUID, 'Server'] = {}
         for raw in source:
             server = cls.fromDict(raw)
             servers[server.serverID] = server
@@ -109,15 +109,15 @@ class Role(Dataclass):
 
     name: str
     color: str
-    roleID: int
+    roleID: uuid.UUID
 
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Role':
         return super().fromDict(source)  #type: ignore
 
     @classmethod
-    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[int, 'Role']:
-        roles: Dict[int, 'Role'] = {}
+    def fromListToDict(cls, source: List[Dict[str, Any]]) -> Dict[uuid.UUID, 'Role']:
+        roles: Dict[uuid.UUID, 'Role'] = {}
         for raw in source:
             role: 'Role' = cls.fromDict(raw)
             roles[role.roleID] = role
@@ -136,9 +136,9 @@ class ServerRegistration(Dataclass):
 
     _slots = ('userID', 'serverID', 'roles', 'admin', 'addChannels',
               'assignRoles', 'kick', 'ban', 'changeNick', 'changeOthersNick')
-    userID: int
-    serverID: int
-    roles: List[int]
+    userID: uuid.UUID
+    serverID: uuid.UUID
+    roles: List[uuid.UUID]
     admin: bool
     addChannels: bool
     assignRoles: bool
@@ -161,8 +161,6 @@ class ServerRegistration(Dataclass):
         return serverRegistration
 
 class ServerPermissionsEnum(Enum):
-    userID = 'userID'
-    serverID = 'serverID'
     roles = 'roles'
     admin = 'admin'
     addChannels = 'addChannels'
@@ -178,8 +176,8 @@ class ChannelPermissions(Dataclass):
               'canDeleteMessage', 'canManageChannel', 'canManagePermissions',
               'canPinMessages,'
               'canMenthonEveryone', 'canAddReactions')
-    userID: int
-    channelID: int
+    userID: uuid.UUID
+    channelID: uuid.UUID
     canRead: bool
     canTalk: bool
     canReadHistory: bool
@@ -211,13 +209,13 @@ class Message(Dataclass):
 
     _slots = ('userID', 'channelID', 'content', 'timestamp', 'pinned',
               'messageID')
-    userID: int
-    channelID: int
+    userID: uuid.UUID
+    channelID: uuid.UUID
     content: str
     timestamp: datetime.datetime
     pinned: bool
-    reactions: List[int]
-    messageID: int
+    reactions: List[uuid.UUID]
+    messageID: uuid.UUID
 
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Message':
@@ -225,9 +223,9 @@ class Message(Dataclass):
 
 
 class Reaction(Dataclass):
-    reactionID: int
+    reactionID: uuid.UUID
     unicode: str
-    users: List[int]
+    users: List[uuid.UUID]
 
     @classmethod
     def fromDict(cls, source: Dict[str, Any]) -> 'Reaction':
@@ -237,9 +235,9 @@ class Reaction(Dataclass):
 class Channel(Dataclass):
 
     _slots = ('channelID', 'name', 'serverID', 'createdAt')
-    channelID: int
+    channelID: uuid.UUID
     name: str
-    serverID: int
+    serverID: uuid.UUID
     createdAt: datetime.datetime
 
     @classmethod
@@ -250,9 +248,9 @@ class Channel(Dataclass):
 class ChannelHistory(Dataclass):
 
     _slots = ('channelID', 'name', 'serverID', 'createdAt')
-    channelID: int
+    channelID: uuid.UUID
     name: str
-    serverID: int
+    serverID: uuid.UUID
     createdAt: datetime.datetime
     messageHistory: List[Message]
 
@@ -288,7 +286,7 @@ class _Database:
 
 class _SQL:
     fetchUserByEmail = 'SELECT * FROM Users WHERE email = $1'
-    signUp = 'INSERT INTO Users(username, password, email, salt, token, createdAt, verified) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, TRUE) RETURNING *'
+    signUp = 'INSERT INTO Users(userID, username, password, email, salt, token, createdAt, verified) VALUES ($1, $2, $3, $4, $5, $6 CURRENT_TIMESTAMP, TRUE) RETURNING *'
     getServers = 'SELECT * FROM ServerRegistration INNER JOIN Servers ON ServerRegistration.userID = $1 and Servers.serverID = ServerRegistration.serverID'
     signIn = 'SELECT * FROM Users WHERE email = $1 and password = $2'
     getPerms = 'SELECT * FROM ServerRegistration WHERE userID = $1 and serverID = $2'
@@ -321,7 +319,10 @@ class Database(_Database):
         except (IndexError, KeyError):
             raise UserNotFound(f'{email} is not registered!')
 
-    async def __validate(self, *, username: str, password: bytes,
+    def makeID(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    async def __validate(self, *, username: str, password: str,
                          email: str) -> None:
         # Check if the user is already registered
         try:
@@ -334,6 +335,9 @@ class Database(_Database):
         if not len(username) >= 3 or not len(username) <= 32:
             raise InvalidCredentials
 
+        if len(password) < 9:
+            raise InvalidCredentials
+
         # Validate the email
         try:
             validate_email(email)
@@ -343,12 +347,14 @@ class Database(_Database):
     async def signUp(self, *, username: str, password: str,
                      email: str) -> User:
         await self.__validate(username=username,
-                              password=password.encode('utf-8'),
+                              password=password,
                               email=email)
 
         salt = secrets.token_hex(32).encode('utf-8')
         token = secrets.token_hex(128)
         hash: bytes = AuthUtils.checkPassword(password.encode('utf-8'), salt)
+        userID = self.makeID()
+
         try:
             user = await self._fetch(_SQL.signUp, username, hash, email, salt,
                                      token)
@@ -358,13 +364,13 @@ class Database(_Database):
         return User.fromDict(user[0])
 
     async def createSession(self,
-                            channelID: int = 0,
-                            serverID: int = 0,
+                            channelID: uuid.UUID = uuid.UUID(int=0),
+                            serverID: uuid.UUID = uuid.UUID(int=0),
                             *,
-                            userID: int,
-                            sessionID: str = '') -> None:
+                            userID: uuid.UUID,
+                            sessionID:  uuid.UUID) -> None:
 
-        if channelID != 0:
+        if channelID != uuid.UUID(int=0):
             if await self.hasChannelPermission(permission=ChannelPermissionEnum.read, userID=userID, channelID=channelID):
                 return await self._execute(
                     'INSERT INTO FocusedItems(sessionID, channelID, serverID, userID) VALUES ($1, $2, $3, $4)',
@@ -375,9 +381,7 @@ class Database(_Database):
                 'INSERT INTO FocusedItems(sessionID, userID) VALUES($1, $2)', sessionID, userID
             )
 
-    async def deleteSession(self, *, sessionID: str) -> None:
-        assert sessionID != ''
-
+    async def deleteSession(self, *, sessionID: uuid.UUID) -> None:
         await self._execute('DELETE FROM FocusedItems WHERE sessionID = $1',
                             sessionID)
 
@@ -406,7 +410,10 @@ class Database(_Database):
         return user
 
     async def signIn(self, *, email: str, password: str) -> User:
-        user: User = await self.fetchUserByEmail(email=email)
+        try:
+            user: User = await self.fetchUserByEmail(email=email)
+        except UserNotFound:
+            raise InvalidCredentials
 
         hash: bytes = AuthUtils.checkPassword(password.encode('utf-8'),
                                               user.salt)
@@ -416,7 +423,7 @@ class Database(_Database):
 
         return user
 
-    async def getServers(self, *, id: int) -> Dict[int, Server]:
+    async def getServers(self, *, id: uuid.UUID) -> Dict[uuid.UUID, Server]:
         servers = await self._fetch(_SQL.getServers, id)
 
         try:
@@ -425,12 +432,12 @@ class Database(_Database):
         except KeyError:
             return {}
 
-    async def getPerms(self, *, userID: int,
-                       serverID: int) -> ServerRegistration:
+    async def getPerms(self, *, userID: uuid.UUID,
+                       serverID: uuid.UUID) -> ServerRegistration:
         perms = await self._fetch(_SQL.getPerms, userID, serverID)
         return ServerRegistration.fromDict(perms)
 
-    async def getRoles(self, *, userID: int, serverID: int) -> Dict[int, Role]:
+    async def getRoles(self, *, userID: uuid.UUID, serverID: uuid.UUID) -> Dict[uuid.UUID, Role]:
         roles = await self._fetch(_SQL.getRoles, userID, serverID)
 
         try:
@@ -439,7 +446,7 @@ class Database(_Database):
         except KeyError:
             return {}
 
-    async def getServersList(self, *, id: int) -> List[Server]:
+    async def getServersList(self, *, id: uuid.UUID) -> List[Server]:
         servers = await self._fetch(_SQL.getServers, id)
 
         try:
@@ -448,12 +455,12 @@ class Database(_Database):
         except KeyError:
             return []
 
-    async def getPermsList(self, *, userID: int,
-                           serverID: int) -> List[ServerRegistration]:
+    async def getPermsList(self, *, userID: uuid.UUID,
+                           serverID: uuid.UUID) -> List[ServerRegistration]:
         perms = await self._fetch(_SQL.getPerms, userID, serverID)
         return ServerRegistration.fromListToList(perms)
 
-    async def getRolesList(self, *, userID: int, serverID: int) -> List[Role]:
+    async def getRolesList(self, *, userID: uuid.UUID, serverID: uuid.UUID) -> List[Role]:
         roles = await self._fetch(_SQL.getRoles, userID, serverID)
 
         try:
@@ -462,7 +469,7 @@ class Database(_Database):
         except KeyError:
             return []
 
-    async def joinServer(self, *, userID: int, serverID: int) -> Server:
+    async def joinServer(self, *, userID: uuid.UUID, serverID: uuid.UUID) -> Server:
         channels = await self._fetch('SELECT channelID FROM Channels WHERE serverID = $1', serverID)
 
 
@@ -470,8 +477,8 @@ class Database(_Database):
 
         return await self.getServer(serverID=serverID)
 
-    async def joinRole(self, *, userID: int, serverID: int, roleID: int,
-                       actor: int) -> Role:
+    async def joinRole(self, *, userID: uuid.UUID, serverID: uuid.UUID, roleID: uuid.UUID,
+                       actor: uuid.UUID) -> Role:
         await self._execute(_SQL.joinRole, roleID, userID, serverID)
         role = await self._fetch(_SQL.getRole, roleID)
         return Role.fromDict(role)
@@ -480,11 +487,11 @@ class Database(_Database):
         if len(name) > 40:
             raise InvalidServerName
 
-    async def getServer(self, *, serverID: int) -> Server:
+    async def getServer(self, *, serverID: uuid.UUID) -> Server:
         server = await self._fetch(_SQL.getServer, serverID)
         return Server.fromDict(server[0])
 
-    async def createServer(self, *, userID: int, name: str, sessionID: str) -> Server:
+    async def createServer(self, *, userID: uuid.UUID, name: str, sessionID: uuid.UUID) -> Server:
         self.validate(name=name)
         server = (await self._fetch('INSERT INTO Servers (ownerID, createdAt, name) VALUES ($1, CURRENT_TIMESTAMP, $2) RETURNING *', userID, name))[0]
         serverID = server['serverid']
@@ -496,8 +503,8 @@ class Database(_Database):
 
         return Server.fromDict(server)
 
-    async def hasChannelPermission(self, *, permission: ChannelPermissionEnum, userID: int,
-                                   channelID: int) -> bool:
+    async def hasChannelPermission(self, *, permission: ChannelPermissionEnum, userID: uuid.UUID,
+                                   channelID: uuid.UUID) -> bool:
 
         permissions = await self._fetch(_SQL.hasChannelPermission, str(permission),
                                         userID, channelID)
@@ -508,14 +515,14 @@ class Database(_Database):
 
         return hasPermission
 
-    async def hasChannelPermissions(self, *, permissions: List[ChannelPermissionEnum], userID: int, channelID: int) -> bool:
+    async def hasChannelPermissions(self, *, permissions: List[ChannelPermissionEnum], userID: uuid.UUID, channelID: uuid.UUID) -> bool:
         for permission in permissions:
             if not await self.hasChannelPermission(permission=permission, channelID=channelID, userID=userID):
                 return False
         return True
 
-    async def hasServerPermission(self, *, permission: ServerPermissionsEnum, userID: int,
-                                  serverID: int) -> bool:
+    async def hasServerPermission(self, *, permission: ServerPermissionsEnum, userID: uuid.UUID,
+                                  serverID: uuid.UUID) -> bool:
 
         permissions = await self._fetch(_SQL.hasServerPermission, permission,
                                         userID, serverID)
@@ -528,8 +535,8 @@ class Database(_Database):
         return hasPermission
 
     async def changeChannelPermission(self, *, permission: ChannelPermissionEnum, value: bool,
-                                      userID: int, channelID: int,
-                                      actor: int) -> ChannelPermissions:
+                                      userID: uuid.UUID, channelID: uuid.UUID,
+                                      actor: uuid.UUID) -> ChannelPermissions:
 
         permissions = await self._fetch(_SQL.changeChannelPermission,
                                         permission, value, userID, channelID,
@@ -543,8 +550,8 @@ class Database(_Database):
 
 
     async def changeServerPermission(self, *, permission: str, value: bool,
-                                     userID: int, serverID: int,
-                                     actor: int) -> ServerRegistration:
+                                     userID: uuid.UUID, serverID: uuid.UUID,
+                                     actor: uuid.UUID) -> ServerRegistration:
 
         permissions = await self._fetch(_SQL.changeServerPermission,
                                         permission, value, userID, serverID,
@@ -555,8 +562,8 @@ class Database(_Database):
 
         return ServerRegistration.fromDict(permissions[0])
 
-    async def sendMessage(self, *, content: str, userID: int,
-                          channelID: int) -> Message:
+    async def sendMessage(self, *, content: str, userID: uuid.UUID,
+                          channelID: uuid.UUID) -> Message:
         if len(content) >= 1000:
             raise MessageTooLong
         if not await self.hasChannelPermissions(channelID=channelID, permissions=[ChannelPermissionEnum.read, ChannelPermissionEnum.talk], userID=userID):
@@ -575,7 +582,7 @@ class Database(_Database):
 
         return parsedMessage
 
-    async def getChannel(self, *, channelID: int, userID: int) -> ChannelHistory:
+    async def getChannel(self, *, channelID: uuid.UUID, userID: uuid.UUID) -> ChannelHistory:
         canReadHistory = await self.hasChannelPermission(permission=ChannelPermissionEnum.readHistory, userID=userID, channelID=channelID)
         if not canReadHistory:
             raise ActorNotAuthorized()
@@ -606,8 +613,8 @@ class Database(_Database):
                                     userID)
         return Message.fromDict(message[0])
 
-    async def deleteMessage(self, *, messageID: int, userID: int,
-                            channelID: int, actor: int) -> None:
+    async def deleteMessage(self, *, messageID: uuid.UUID, userID: uuid.UUID,
+                            channelID: uuid.UUID, actor: uuid.UUID) -> None:
         """Deletes a message
 
         Args:
@@ -628,7 +635,7 @@ class Database(_Database):
 
         await self._execute(_SQL.deleteMessage, messageID)
 
-    async def isInServer(self, *, userID: int, serverID: int) -> bool:
+    async def isInServer(self, *, userID: uuid.UUID, serverID: uuid.UUID) -> bool:
         """Checks to see if a user is in a server
 
         Args:
@@ -642,10 +649,10 @@ class Database(_Database):
 
         return len(userID) == 1
 
-    async def serverIDFromChannelID(self, *, channelID: int) -> int:
-        return int((await self._fetch('SELECT serverID FROM channels WHERE channelID = $1', channelID))[0]['serverID'])
+    async def serverIDFromChannelID(self, *, channelID: uuid.UUID) -> uuid.UUID:
+        return (await self._fetch('SELECT serverID FROM channels WHERE channelID = $1', channelID))[0]['serverid'] #type: ignore
 
-    async def addReaction(self, *, messageID: int, userID: int, channelID: int,
+    async def addReaction(self, *, messageID: uuid.UUID, userID: uuid.UUID, channelID: uuid.UUID,
                           unicode: str) -> Reaction:
         """Adds a reaction to the database\n
 
@@ -680,7 +687,7 @@ class Database(_Database):
         else:
             raise ActorNotAuthorized()
 
-    async def removeReaction(self, *, reactionID: int, userID: int, channelID: int) -> None:
+    async def removeReaction(self, *, reactionID: uuid.UUID, userID: uuid.UUID, channelID: uuid.UUID) -> None:
         """Removes a reaction from the database\n
 
         Args:\n
@@ -708,7 +715,7 @@ class Database(_Database):
         else:
             raise ActorNotAuthorized()
 
-    async def createChannel(self, *, serverID: int, name: str, userID: int) -> Channel:
+    async def createChannel(self, *, serverID: uuid.UUID, name: str, userID: uuid.UUID) -> Channel:
         """Creates a new channel.
 
         Args:
@@ -729,8 +736,8 @@ class Database(_Database):
         else:
             raise ActorNotAuthorized()
 
-    async def changeSubscribedChannel(self, *, channelID: int, userID: int,
-                                      sessionID: str) -> None:
+    async def changeSubscribedChannel(self, *, channelID: uuid.UUID, userID: uuid.UUID,
+                                      sessionID: uuid.UUID) -> None:
         """Changes the channel a user is subscribed to in a session.
 
         Args:
@@ -750,18 +757,18 @@ class Database(_Database):
                 channelID, userID, sessionID)
         raise ActorNotAuthorized()
 
-    async def getAllSessionsSubscribedToChannel(self, *, channelID: int): # type: ignore
+    async def getAllSessionsSubscribedToChannel(self, *, channelID: uuid.UUID): # type: ignore
         sessions = await self._fetch('SELECT sessionID FROM FocusedItems WHERE channelID = $1', channelID)
         for sessionID in sessions:
             yield sessionID[0]
 
-    async def getAllSessionsSubscribedToServer(self, *, serverID: int): # type: ignore
+    async def getAllSessionsSubscribedToServer(self, *, serverID: uuid.UUID): # type: ignore
         sessions = await self._fetch('SELECT sessionID FROM FocusedItems WHERE serverID = $1', serverID)
         for sessionID in sessions:
             yield sessionID[0]
 
-    async def changeSubscribedServer(self, *, serverID: int, userID: int,
-                                      sessionID: str) -> None:
+    async def changeSubscribedServer(self, *, serverID: uuid.UUID, userID: uuid.UUID,
+                                      sessionID: uuid.UUID) -> None:
         """Changes the channel a user is subscribed to in a session.
 
         Args:

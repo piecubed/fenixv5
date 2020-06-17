@@ -8,6 +8,8 @@
 import copy
 from typing import (Any, Callable, Dict, Iterable, Iterator, List, Optional,
                     Type, Union, get_type_hints)
+import json
+import uuid
 
 
 class _AutoSlotsMeta(type):
@@ -80,6 +82,17 @@ class BaseMessage(metaclass=_AutoSlotsMeta):
     id: Optional[int]
     _raw: Dict[str, Any]
 
+    def dumps(self) -> str:
+        raw = {}
+        for attr, attr_type in self.__annotations.items():
+            if attr_type == uuid.UUID:
+                id: uuid.UUID = getattr(self, attr)
+                raw[attr] = str(id)
+            else:
+                raw[attr] = getattr(self, attr)
+
+        return json.dumps(raw)
+
     def __init__(self, data: Dict[Any, Any]) -> None:
         self.extension: str
         actualData: Dict[str, Any] = {}
@@ -97,17 +110,20 @@ class BaseMessage(metaclass=_AutoSlotsMeta):
                 continue
 
             value = data[attr]
+            if attr_type == uuid.UUID:
+                value = uuid.UUID(value)
+
             if not _isinstance(value, attr_type):
                 raise TypeError(f'Expected {attr_type!r}, got {value!r} for {attr}')
             actualData[attr] = value
             setattr(self, attr, value)
 
         self._raw = actualData
+        self._raw['type'] = str(self.__class__).split('.')[-1].split("'")[0]
 
     def __iter__(self) -> Iterator[Any]:
         for attr in self.__class__.__annotations:
             yield getattr(self, attr)
-
 
 class ProtocolHelper:
     __slots__ = ('types', )

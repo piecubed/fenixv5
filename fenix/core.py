@@ -24,7 +24,7 @@ import fenix.extension as extension
 
 class FenixCore:
     def __init__(self, extensions: Dict[str, extension.Extension]) -> None:
-        for extensionName, extensionClass in extensions:
+        for extensionName, extensionClass in extensions: #type: ignore
             self.extensions[extensionName] = extensionClass(self) #type: ignore
         self.extensions[None] = main.MainExt(self) #type: ignore
 
@@ -42,7 +42,7 @@ class FenixCore:
                               websocket: websockets.WebSocketServerProtocol,
                               path: str) -> None:
         user: database.User
-        if path == '/password' or path == '/signUp':
+        if path == '/signIn' or path == '/signUp':
             email = websocket.request_headers['email']
             user = await self.database.fetchUserByEmail(email=email)
 
@@ -50,7 +50,6 @@ class FenixCore:
             token = websocket.request_headers['token']
             user = await self.database.fetchUserByToken(token=token)
         else:
-            print(path, 'got through the filter.')
             await websocket.close(
                 code=1008,
                 reason=
@@ -166,9 +165,10 @@ class FenixCore:
             return (status, Headers(), b'')
 
     async def connect(self) -> None:
-        print('Hosting websocket on ws://bloblet.com:43618/')
+        print('[INFO] Hosting websocket on ws://bloblet.com:43618/')
         await websockets.serve(
             ws_handler=self.handleWebsocket,
+            process_request=self.handleHTTP,
             host='',
             port=43618
         )

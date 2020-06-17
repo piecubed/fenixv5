@@ -9,7 +9,6 @@ mypy = "*"
 sphinx = "*"
 sphinx-glpi-theme = "*"
 
-
 [packages]
 websockets = "*"
 asyncpg = "*"
